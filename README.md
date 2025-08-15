@@ -72,13 +72,10 @@ GOVCONNECT is a modern, user-friendly platform designed to streamline access to 
 
 #### Backend (.env)
 ```env
+NODE_ENV=development
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/govconnect
-JWT_SECRET=your_jwt_secret
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your_email
-SMTP_PASS=your_password
+MONGODB_URI=mongodb+srv://root:pass12345@cluster1.f8cotog.mongodb.net/govconnect
+JWT_SECRET=govconnect-secret-key-2024-sri-lanka
 ```
 
 #### Frontend (.env)
