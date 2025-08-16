@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Filter, MapPin, Clock, DollarSign, FileText, Grid, List } from 'lucide-react';
-import { ChatbotButton } from '../components/chatbot_button';
 
 import axios from 'axios';
 
@@ -550,8 +549,6 @@ export const Services = () => {
           </div>
         </div>
       </div>
-      {/* Floating Chatbot */}
-        <ChatbotButton />
     </div>
   );
 };
