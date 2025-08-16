@@ -96,13 +96,13 @@ GOVCONNECT is a modern, user-friendly platform designed to streamline access to 
 ```env
 NODE_ENV=development
 PORT=5000
-MONGODB_URI=mongodb+srv://root:pass12345@cluster1.f8cotog.mongodb.net/govconnect
-JWT_SECRET=govconnect-secret-key-2024-sri-lanka
+MONGODB_URI=
+JWT_SECRET=
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=sayesara2025@gmail.com
-SMTP_PASS=hhmfoltyopznwwnc
-EMAIL_FROM=sayesara2025@gmail.com
+SMTP_USER=
+SMTP_PASS=
+EMAIL_FROM=
 ```
 
 #### Frontend (.env)
@@ -112,7 +112,7 @@ VITE_API_URL=http://localhost:5000/api
 
 #### Chatbot (.env)
 ```env
-MISTRAL_API_KEY=NbyuptruAsVKPYOdDA3xtNygCzyVkzeH
+MISTRAL_API_KEY=
 MISTRAL_MODEL_ID=ft:open-mistral-7b:0ffd4d8a:20250718:0b9abfb2
 VECTOR_DIR=govconnect_nic
 DATA_DIR=data
