@@ -62,9 +62,7 @@ export const MobileHeader = () => {
                 <ArrowLeft size={22} strokeWidth={2.5} />
               </button>
             ) : (
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-xs">GC</span>
-              </div>
+              <img src="/src/assets/logo.png" alt="GovConnect Logo" className="w-8 h-8 rounded-lg shadow-sm" />
             )}
             
             {/* Page Title */}

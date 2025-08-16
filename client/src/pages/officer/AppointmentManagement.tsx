@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/layout/AdminLayout';
 import { FeedbackDisplay } from '../../components/feedback/FeedbackDisplay';
 import { 
@@ -81,6 +81,7 @@ interface Officer {
 
 export const AppointmentManagement = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [officers, setOfficers] = useState<Officer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +97,28 @@ export const AppointmentManagement = () => {
     notes: '',
     officerId: ''
   });
+
+  // Update filters when URL parameters change
+  useEffect(() => {
+    setFilters({
+      status: searchParams.get('status') || '',
+      date: searchParams.get('date') || '',
+      search: searchParams.get('search') || ''
+    });
+  }, [searchParams]);
+  
+  // Function to update URL parameters
+  const updateUrlParams = (newFilters: {status: string, date: string, search: string}) => {
+    const params = new URLSearchParams();
+    if (newFilters.status) params.append('status', newFilters.status);
+    if (newFilters.date) params.append('date', newFilters.date);
+    if (newFilters.search) params.append('search', newFilters.search);
+    
+    navigate({
+      pathname: '/officer/appointments',
+      search: params.toString()
+    });
+  };
 
   useEffect(() => {
     fetchAppointments();
@@ -236,12 +259,18 @@ export const AppointmentManagement = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">
-                {filters.date === 'today' ? 'Today\'s Schedule' : 'Appointment Management'}
+                {filters.date === 'today' 
+                  ? 'Today\'s Schedule' 
+                  : filters.status 
+                    ? `${filters.status.charAt(0).toUpperCase() + filters.status.slice(1).replace('_', ' ')} Appointments` 
+                    : 'Appointment Management'}
               </h1>
               <p className="opacity-90">
                 {filters.date === 'today' 
                   ? `Today's appointments - ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`
-                  : 'Manage and track citizen appointments'
+                  : filters.status
+                    ? `Viewing ${filters.status.replace('_', ' ')} appointments only`
+                    : 'Manage and track all citizen appointments'
                 }
               </p>
             </div>
@@ -325,7 +354,11 @@ export const AppointmentManagement = () => {
                 placeholder="Search appointments..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                onChange={(e) => {
+                  const newSearch = e.target.value;
+                  setFilters(prev => ({ ...prev, search: newSearch }));
+                  updateUrlParams({ ...filters, search: newSearch });
+                }}
               />
             </div>
 
@@ -333,7 +366,11 @@ export const AppointmentManagement = () => {
             <select
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+              onChange={(e) => {
+                const newStatus = e.target.value;
+                setFilters(prev => ({ ...prev, status: newStatus }));
+                updateUrlParams({ ...filters, status: newStatus });
+              }}
             >
               <option value="">All Status</option>
               <option value="pending">Pending</option>
@@ -349,16 +386,22 @@ export const AppointmentManagement = () => {
             <select
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={filters.date}
-              onChange={(e) => setFilters(prev => ({ ...prev, date: e.target.value }))}
+              onChange={(e) => {
+                const newDate = e.target.value;
+                setFilters(prev => ({ ...prev, date: newDate }));
+                updateUrlParams({ ...filters, date: newDate });
+              }}
             >
               <option value="">All Dates</option>
-              <option value="today">Today</option>
-              <option value={new Date().toISOString().split('T')[0]}>Today (Date)</option>
+              <option value="today">Today Only</option>
             </select>
 
             {/* Clear Filters */}
             <button
-              onClick={() => setFilters({ status: '', date: '', search: '' })}
+              onClick={() => {
+                setFilters({ status: '', date: '', search: '' });
+                navigate('/officer/appointments');
+              }}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center"
             >
               <Filter size={20} className="mr-2" />
@@ -372,7 +415,7 @@ export const AppointmentManagement = () => {
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">
-                {filters.date === 'today' ? 'Today\'s Schedule' : 'Appointments'} ({appointments.length})
+                {filters.date === 'today' ? 'Today\'s Schedule' : filters.status ? `${filters.status.charAt(0).toUpperCase() + filters.status.slice(1).replace('_', ' ')} Appointments` : 'All Appointments'} ({appointments.length})
               </h2>
               {filters.date === 'today' && (
                 <div className="flex items-center space-x-2 text-sm text-gray-600">

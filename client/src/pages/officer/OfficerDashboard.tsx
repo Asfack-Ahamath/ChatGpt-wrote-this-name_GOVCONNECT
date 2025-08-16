@@ -66,14 +66,14 @@ export const OfficerDashboard = () => {
   const quickActions = [
     {
       title: 'Manage Appointments',
-      description: 'View and update appointment status',
+      description: 'View and update all appointments',
       icon: Calendar,
       link: '/officer/appointments',
       color: 'bg-blue-500'
     },
     {
       title: 'Today\'s Schedule',
-      description: 'View today\'s appointments',
+      description: 'View today\'s appointments only',
       icon: Clock,
       link: '/officer/appointments?date=today',
       color: 'bg-green-500'

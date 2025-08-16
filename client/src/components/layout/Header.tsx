@@ -41,9 +41,7 @@ export const Header = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo and Title */}
           <Link to="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-200">
-              <span className="text-white font-bold text-sm">GC</span>
-            </div>
+            <img src="/src/assets/logo.png" alt="GovConnect Logo" className="w-10 h-10 rounded-xl shadow-lg group-hover:scale-105 transition-transform duration-200" />
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
                 GOVCONNECT
