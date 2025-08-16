@@ -16,8 +16,6 @@ import {
   Building2
 } from 'lucide-react';
 
-import { ChatbotButton } from '../components/chatbot_button';
-
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -584,9 +582,6 @@ export const Dashboard = () => {
             )}
           </div>
         </div>
-
-        {/* Floating Chatbot */}
-          <ChatbotButton />
       </div>
     </div>
   );
