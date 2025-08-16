@@ -11,8 +11,7 @@ from dotenv import load_dotenv
 # Import your existing functions
 from chatbot_core import (
     load_vector_store, 
-    retrieve_documents, 
-    format_context, 
+    retrieve_documents,  
     call_mistral_api,
     load_documents,
     split_documents,
@@ -37,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Global variables
 db = None
-VECTOR_DIR = os.getenv('VECTOR_DIR', 'govconnect_nic')
+VECTOR_DIR = os.getenv('VECTOR_DIR', 'govconnect_KB')
 
 def initialize_vector_store():
     """Initialize or load the vector store at startup."""
@@ -57,38 +56,6 @@ def initialize_vector_store():
     except Exception as e:
         logger.error(f"Failed to initialize vector store: {str(e)}")
         db = None
-
-def log_interaction(query, answer, user_ip=None):
-    """Log chat interactions for monitoring and improvement."""
-    try:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = {
-            "timestamp": timestamp,
-            "query": query,
-            "answer": answer,
-            "user_ip": user_ip
-        }
-        
-        log_path = "chat_logs.json"
-        if os.path.exists(log_path):
-            with open(log_path, "r", encoding="utf-8") as f:
-                try:
-                    logs = json.load(f)
-                except json.JSONDecodeError:
-                    logs = []
-        else:
-            logs = []
-        
-        logs.append(log_entry)
-        
-        # Keep only last 1000 interactions to prevent file from growing too large
-        if len(logs) > 1000:
-            logs = logs[-1000:]
-        
-        with open(log_path, "w", encoding="utf-8") as f:
-            json.dump(logs, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        logger.error(f"Failed to log interaction: {str(e)}")
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -135,12 +102,12 @@ def chat_with_bot():
             })
         
         # Format context and call Mistral API
-        context = format_context(relevant_docs)
+        context = relevant_docs
         answer = call_mistral_api(query, context)
         
         # Log the interaction
         user_ip = request.remote_addr
-        log_interaction(query, answer, user_ip)
+        #log_interaction(query, answer, user_ip)
         
         logger.info(f"Successfully processed query from {user_ip}")
         
