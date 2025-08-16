@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # MongoDB Service
+  mongodb:
+    image: mongo:latest
+    container_name: govconnect-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=govconnect
+    networks:
+      - govconnect-network
+    restart: unless-stopped
+
+  # Backend Node.js Service
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: govconnect-server
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/govconnect
+      - JWT_SECRET=your_jwt_secret_key_here
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+    networks:
+      - govconnect-network
+    restart: unless-stopped
+
+  # Frontend React Service
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: govconnect-client
+    ports:
+      - "3000:80"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    depends_on:
+      - server
+    networks:
+      - govconnect-network
+    restart: unless-stopped
+
+  # Python Chatbot Service
+  chatbot:
+    build:
+      context: ./chatbot
+      dockerfile: Dockerfile
+    container_name: govconnect-chatbot
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - PORT=5001
+    volumes:
+      - ./chatbot:/app
+      - chatbot_data:/app/data
+    networks:
+      - govconnect-network
+    restart: unless-stopped
+
+networks:
+  govconnect-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  chatbot_data:
