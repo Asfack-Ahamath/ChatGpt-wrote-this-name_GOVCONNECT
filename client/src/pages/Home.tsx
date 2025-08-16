@@ -12,8 +12,6 @@ import {
   Globe
 } from 'lucide-react';
 
-import { ChatbotButton } from '../components/chatbot_button';
-
 export const Home = () => {
   const { user } = useAuth();
 
@@ -217,8 +215,6 @@ export const Home = () => {
             </p>
           </div>
 
-        {/* Floating Chatbot */}
-          <ChatbotButton />
         </div>
       </section>
 
