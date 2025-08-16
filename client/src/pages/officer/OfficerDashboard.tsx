@@ -51,7 +51,7 @@ export const OfficerDashboard = () => {
 
   const fetchOfficerStats = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('govconnect_token');
       const response = await axios.get(`${API_BASE_URL}/officer/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -6,13 +6,9 @@ import {
   RefreshCw, 
   Bell, 
   Shield, 
-  Globe, 
   Clock,
-  Mail,
-  Phone,
   Database,
-  Server,
-  Key
+  Server
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -22,35 +18,64 @@ interface SystemSettings {
   general: {
     systemName: string;
     systemDescription: string;
+    systemVersion: string;
+    systemLogo: string;
+    timezone: string;
+    defaultLanguage: string;
+    supportedLanguages: string[];
     maintenanceMode: boolean;
-    allowRegistrations: boolean;
-    maxAppointmentsPerUser: number;
-    defaultAppointmentDuration: number;
-  };
-  notifications: {
-    emailEnabled: boolean;
-    smsEnabled: boolean;
-    reminderHours: number;
-    adminNotifications: boolean;
-  };
-  security: {
-    sessionTimeout: number;
-    passwordMinLength: number;
-    requireEmailVerification: boolean;
-    maxLoginAttempts: number;
-    lockoutDuration: number;
+    registrationEnabled: boolean;
+    emailVerificationRequired: boolean;
   };
   appointment: {
-    advanceBookingDays: number;
-    cancellationDeadline: number;
+    maxAdvanceBookingDays: number;
+    minAdvanceBookingHours: number;
+    defaultAppointmentDuration: number;
+    allowRescheduling: boolean;
     rescheduleLimit: number;
-    autoConfirmation: boolean;
+    cancellationDeadlineHours: number;
+    autoConfirmAppointments: boolean;
+    reminderNotifications: boolean;
+    reminderHoursBefore: number[];
   };
-  contact: {
-    supportEmail: string;
-    supportPhone: string;
-    address: string;
-    workingHours: string;
+  notification: {
+    emailNotifications: boolean;
+    smsNotifications: boolean;
+    pushNotifications: boolean;
+    emailProvider: string;
+    smtpHost: string;
+    smtpPort: number;
+    smtpSecure: boolean;
+    smtpUser: string;
+    smtpPassword: string;
+  };
+  security: {
+    passwordMinLength: number;
+    passwordRequireUppercase: boolean;
+    passwordRequireLowercase: boolean;
+    passwordRequireNumbers: boolean;
+    passwordRequireSymbols: boolean;
+    sessionTimeout: number;
+    maxLoginAttempts: number;
+    lockoutDuration: number;
+    twoFactorAuth: boolean;
+    ipWhitelisting: boolean;
+    auditLogging: boolean;
+  };
+  backup: {
+    autoBackup: boolean;
+    backupFrequency: string;
+    backupRetention: number;
+    backupLocation: string;
+    lastBackup: Date;
+  };
+  performance: {
+    cacheEnabled: boolean;
+    cacheDuration: number;
+    compressionEnabled: boolean;
+    rateLimiting: boolean;
+    rateLimit: number;
+    rateLimitWindow: number;
   };
 }
 
@@ -58,36 +83,65 @@ export const SystemSettings = () => {
   const [settings, setSettings] = useState<SystemSettings>({
     general: {
       systemName: 'GOVCONNECT',
-      systemDescription: 'Government Service Appointment System',
+      systemDescription: 'Sri Lanka Government Services Portal',
+      systemVersion: '1.0.0',
+      systemLogo: '/assets/logo.png',
+      timezone: 'Asia/Colombo',
+      defaultLanguage: 'english',
+      supportedLanguages: ['english', 'sinhala', 'tamil'],
       maintenanceMode: false,
-      allowRegistrations: true,
-      maxAppointmentsPerUser: 5,
-      defaultAppointmentDuration: 30
-    },
-    notifications: {
-      emailEnabled: true,
-      smsEnabled: false,
-      reminderHours: 24,
-      adminNotifications: true
-    },
-    security: {
-      sessionTimeout: 60,
-      passwordMinLength: 6,
-      requireEmailVerification: true,
-      maxLoginAttempts: 5,
-      lockoutDuration: 15
+      registrationEnabled: true,
+      emailVerificationRequired: true
     },
     appointment: {
-      advanceBookingDays: 30,
-      cancellationDeadline: 2,
+      maxAdvanceBookingDays: 30,
+      minAdvanceBookingHours: 2,
+      defaultAppointmentDuration: 30,
+      allowRescheduling: true,
       rescheduleLimit: 3,
-      autoConfirmation: false
+      cancellationDeadlineHours: 24,
+      autoConfirmAppointments: false,
+      reminderNotifications: true,
+      reminderHoursBefore: [24, 2]
     },
-    contact: {
-      supportEmail: 'support@govconnect.lk',
-      supportPhone: '011-1234567',
-      address: 'Government Office Complex, Colombo 01',
-      workingHours: 'Monday - Friday: 8:30 AM - 4:30 PM'
+    notification: {
+      emailNotifications: true,
+      smsNotifications: false,
+      pushNotifications: true,
+      emailProvider: 'smtp',
+      smtpHost: 'smtp.gmail.com',
+      smtpPort: 587,
+      smtpSecure: false,
+      smtpUser: '',
+      smtpPassword: ''
+    },
+    security: {
+      passwordMinLength: 8,
+      passwordRequireUppercase: true,
+      passwordRequireLowercase: true,
+      passwordRequireNumbers: true,
+      passwordRequireSymbols: false,
+      sessionTimeout: 24,
+      maxLoginAttempts: 5,
+      lockoutDuration: 30,
+      twoFactorAuth: false,
+      ipWhitelisting: false,
+      auditLogging: true
+    },
+    backup: {
+      autoBackup: true,
+      backupFrequency: 'daily',
+      backupRetention: 30,
+      backupLocation: 'local',
+      lastBackup: new Date(Date.now() - 24 * 60 * 60 * 1000)
+    },
+    performance: {
+      cacheEnabled: true,
+      cacheDuration: 300,
+      compressionEnabled: true,
+      rateLimiting: true,
+      rateLimit: 100,
+      rateLimitWindow: 15
     }
   });
   
@@ -107,7 +161,13 @@ export const SystemSettings = () => {
       const response = await axios.get(`${API_BASE_URL}/admin/settings`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSettings(response.data.data);
+      
+      if (response.data.success && response.data.data) {
+        setSettings(prevSettings => ({
+          ...prevSettings,
+          ...response.data.data
+        }));
+      }
     } catch (error) {
       console.error('Error fetching settings:', error);
       // Use default settings if fetch fails
@@ -154,10 +214,11 @@ export const SystemSettings = () => {
 
   const tabs = [
     { id: 'general', label: 'General', icon: Settings },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'security', label: 'Security', icon: Shield },
     { id: 'appointment', label: 'Appointments', icon: Clock },
-    { id: 'contact', label: 'Contact', icon: Phone }
+    { id: 'notification', label: 'Notifications', icon: Bell },
+    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'backup', label: 'Backup', icon: Database },
+    { id: 'performance', label: 'Performance', icon: Server }
   ];
 
   const updateSettings = (section: keyof SystemSettings, field: string, value: any) => {
@@ -253,22 +314,20 @@ export const SystemSettings = () => {
                       <input
                         type="text"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.general.systemName}
+                        value={settings.general.systemName || ''}
                         onChange={(e) => updateSettings('general', 'systemName', e.target.value)}
                       />
                     </div>
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Max Appointments per User
+                        System Version
                       </label>
                       <input
-                        type="number"
-                        min="1"
-                        max="20"
+                        type="text"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.general.maxAppointmentsPerUser}
-                        onChange={(e) => updateSettings('general', 'maxAppointmentsPerUser', parseInt(e.target.value))}
+                        value={settings.general.systemVersion || ''}
+                        onChange={(e) => updateSettings('general', 'systemVersion', e.target.value)}
                       />
                     </div>
                   </div>
@@ -280,7 +339,7 @@ export const SystemSettings = () => {
                     <textarea
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                      value={settings.general.systemDescription}
+                                              value={settings.general.systemDescription || ''}
                       onChange={(e) => updateSettings('general', 'systemDescription', e.target.value)}
                     />
                   </div>
@@ -291,7 +350,7 @@ export const SystemSettings = () => {
                         type="checkbox"
                         id="maintenanceMode"
                         className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
-                        checked={settings.general.maintenanceMode}
+                        checked={settings.general.maintenanceMode || false}
                         onChange={(e) => updateSettings('general', 'maintenanceMode', e.target.checked)}
                       />
                       <label htmlFor="maintenanceMode" className="text-sm font-medium text-gray-700">
@@ -302,12 +361,12 @@ export const SystemSettings = () => {
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
-                        id="allowRegistrations"
+                        id="registrationEnabled"
                         className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
-                        checked={settings.general.allowRegistrations}
-                        onChange={(e) => updateSettings('general', 'allowRegistrations', e.target.checked)}
+                        checked={settings.general.registrationEnabled || false}
+                        onChange={(e) => updateSettings('general', 'registrationEnabled', e.target.checked)}
                       />
-                      <label htmlFor="allowRegistrations" className="text-sm font-medium text-gray-700">
+                      <label htmlFor="registrationEnabled" className="text-sm font-medium text-gray-700">
                         Allow New Registrations
                       </label>
                     </div>
@@ -315,35 +374,169 @@ export const SystemSettings = () => {
                 </div>
               )}
 
-              {/* Notification Settings */}
-              {activeTab === 'notifications' && (
+              {/* Appointment Settings */}
+              {activeTab === 'appointment' && (
                 <div className="space-y-6">
-                  <h2 className="text-xl font-bold text-gray-900">Notification Settings</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Appointment Settings</h2>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Max Advance Booking Days
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="365"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.appointment.maxAdvanceBookingDays || 30}
+                        onChange={(e) => updateSettings('appointment', 'maxAdvanceBookingDays', parseInt(e.target.value))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Min Advance Booking Hours
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="48"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.appointment.minAdvanceBookingHours || 2}
+                        onChange={(e) => updateSettings('appointment', 'minAdvanceBookingHours', parseInt(e.target.value))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Default Duration (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        min="15"
+                        max="240"
+                        step="15"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.appointment.defaultAppointmentDuration || 30}
+                        onChange={(e) => updateSettings('appointment', 'defaultAppointmentDuration', parseInt(e.target.value))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Reschedule Limit
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.appointment.rescheduleLimit || 3}
+                        onChange={(e) => updateSettings('appointment', 'rescheduleLimit', parseInt(e.target.value))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Cancellation Deadline (hours)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="168"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.appointment.cancellationDeadlineHours || 24}
+                        onChange={(e) => updateSettings('appointment', 'cancellationDeadlineHours', parseInt(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
-                        id="emailEnabled"
+                        id="allowRescheduling"
                         className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
-                        checked={settings.notifications.emailEnabled}
-                        onChange={(e) => updateSettings('notifications', 'emailEnabled', e.target.checked)}
+                        checked={settings.appointment.allowRescheduling || false}
+                        onChange={(e) => updateSettings('appointment', 'allowRescheduling', e.target.checked)}
                       />
-                      <label htmlFor="emailEnabled" className="text-sm font-medium text-gray-700">
-                        Enable Email Notifications
+                      <label htmlFor="allowRescheduling" className="text-sm font-medium text-gray-700">
+                        Allow Rescheduling
                       </label>
                     </div>
 
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
-                        id="smsEnabled"
+                        id="autoConfirmAppointments"
                         className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
-                        checked={settings.notifications.smsEnabled}
-                        onChange={(e) => updateSettings('notifications', 'smsEnabled', e.target.checked)}
+                        checked={settings.appointment.autoConfirmAppointments || false}
+                        onChange={(e) => updateSettings('appointment', 'autoConfirmAppointments', e.target.checked)}
                       />
-                      <label htmlFor="smsEnabled" className="text-sm font-medium text-gray-700">
-                        Enable SMS Notifications
+                      <label htmlFor="autoConfirmAppointments" className="text-sm font-medium text-gray-700">
+                        Auto Confirm Appointments
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="reminderNotifications"
+                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                        checked={settings.appointment.reminderNotifications || false}
+                        onChange={(e) => updateSettings('appointment', 'reminderNotifications', e.target.checked)}
+                      />
+                      <label htmlFor="reminderNotifications" className="text-sm font-medium text-gray-700">
+                        Send Reminder Notifications
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Notification Settings */}
+              {activeTab === 'notification' && (
+                <div className="space-y-6">
+                  <h2 className="text-xl font-bold text-gray-900">Notification Settings</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="emailNotifications"
+                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                        checked={settings.notification.emailNotifications}
+                        onChange={(e) => updateSettings('notification', 'emailNotifications', e.target.checked)}
+                      />
+                      <label htmlFor="emailNotifications" className="text-sm font-medium text-gray-700">
+                        Email Notifications
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="smsNotifications"
+                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                        checked={settings.notification.smsNotifications}
+                        onChange={(e) => updateSettings('notification', 'smsNotifications', e.target.checked)}
+                      />
+                      <label htmlFor="smsNotifications" className="text-sm font-medium text-gray-700">
+                        SMS Notifications
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="pushNotifications"
+                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                        checked={settings.notification.pushNotifications}
+                        onChange={(e) => updateSettings('notification', 'pushNotifications', e.target.checked)}
+                      />
+                      <label htmlFor="pushNotifications" className="text-sm font-medium text-gray-700">
+                        Push Notifications
                       </label>
                     </div>
                   </div>
@@ -351,30 +544,65 @@ export const SystemSettings = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Reminder Hours Before Appointment
+                        SMTP Host
                       </label>
                       <input
-                        type="number"
-                        min="1"
-                        max="168"
+                        type="text"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.notifications.reminderHours}
-                        onChange={(e) => updateSettings('notifications', 'reminderHours', parseInt(e.target.value))}
+                        value={settings.notification.smtpHost || ''}
+                        onChange={(e) => updateSettings('notification', 'smtpHost', e.target.value)}
                       />
                     </div>
 
-                    <div className="flex items-center space-x-3 pt-8">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        SMTP Port
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.notification.smtpPort || 587}
+                        onChange={(e) => updateSettings('notification', 'smtpPort', parseInt(e.target.value))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        SMTP Username
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.notification.smtpUser || ''}
+                        onChange={(e) => updateSettings('notification', 'smtpUser', e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        SMTP Password
+                      </label>
+                      <input
+                        type="password"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.notification.smtpPassword === '[HIDDEN]' ? '' : settings.notification.smtpPassword || ''}
+                        onChange={(e) => updateSettings('notification', 'smtpPassword', e.target.value)}
+                        placeholder={settings.notification.smtpPassword === '[HIDDEN]' ? 'Password hidden' : ''}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
-                        id="adminNotifications"
+                      id="smtpSecure"
                         className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
-                        checked={settings.notifications.adminNotifications}
-                        onChange={(e) => updateSettings('notifications', 'adminNotifications', e.target.checked)}
+                      checked={settings.notification.smtpSecure || false}
+                      onChange={(e) => updateSettings('notification', 'smtpSecure', e.target.checked)}
                       />
-                      <label htmlFor="adminNotifications" className="text-sm font-medium text-gray-700">
-                        Admin Notifications
+                    <label htmlFor="smtpSecure" className="text-sm font-medium text-gray-700">
+                      Use Secure Connection (SSL/TLS)
                       </label>
-                    </div>
                   </div>
                 </div>
               )}
@@ -394,7 +622,7 @@ export const SystemSettings = () => {
                         min="15"
                         max="480"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.security.sessionTimeout}
+                        value={settings.security.sessionTimeout || 24}
                         onChange={(e) => updateSettings('security', 'sessionTimeout', parseInt(e.target.value))}
                       />
                     </div>
@@ -408,7 +636,7 @@ export const SystemSettings = () => {
                         min="6"
                         max="20"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.security.passwordMinLength}
+                        value={settings.security.passwordMinLength || 8}
                         onChange={(e) => updateSettings('security', 'passwordMinLength', parseInt(e.target.value))}
                       />
                     </div>
@@ -422,7 +650,7 @@ export const SystemSettings = () => {
                         min="3"
                         max="10"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.security.maxLoginAttempts}
+                        value={settings.security.maxLoginAttempts || 5}
                         onChange={(e) => updateSettings('security', 'maxLoginAttempts', parseInt(e.target.value))}
                       />
                     </div>
@@ -436,7 +664,7 @@ export const SystemSettings = () => {
                         min="5"
                         max="120"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.security.lockoutDuration}
+                        value={settings.security.lockoutDuration || 30}
                         onChange={(e) => updateSettings('security', 'lockoutDuration', parseInt(e.target.value))}
                       />
                     </div>
@@ -445,135 +673,167 @@ export const SystemSettings = () => {
                   <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
-                      id="requireEmailVerification"
+                      id="passwordRequireUppercase"
                       className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
-                      checked={settings.security.requireEmailVerification}
-                      onChange={(e) => updateSettings('security', 'requireEmailVerification', e.target.checked)}
+                      checked={settings.security.passwordRequireUppercase || false}
+                      onChange={(e) => updateSettings('security', 'passwordRequireUppercase', e.target.checked)}
                     />
-                    <label htmlFor="requireEmailVerification" className="text-sm font-medium text-gray-700">
-                      Require Email Verification for New Users
+                    <label htmlFor="passwordRequireUppercase" className="text-sm font-medium text-gray-700">
+                      Require Uppercase Letters
                     </label>
                   </div>
                 </div>
               )}
 
-              {/* Appointment Settings */}
-              {activeTab === 'appointment' && (
+
+
+              {/* Backup Settings */}
+              {activeTab === 'backup' && (
                 <div className="space-y-6">
-                  <h2 className="text-xl font-bold text-gray-900">Appointment Settings</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Backup & Recovery</h2>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="autoBackup"
+                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                        checked={settings.backup.autoBackup || false}
+                        onChange={(e) => updateSettings('backup', 'autoBackup', e.target.checked)}
+                      />
+                      <label htmlFor="autoBackup" className="text-sm font-medium text-gray-700">
+                        Enable Auto Backup
+                      </label>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Advance Booking Days
+                        Backup Frequency
+                      </label>
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                        value={settings.backup.backupFrequency || 'daily'}
+                        onChange={(e) => updateSettings('backup', 'backupFrequency', e.target.value)}
+                      >
+                        <option value="hourly">Hourly</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Retention Days
                       </label>
                       <input
                         type="number"
                         min="1"
                         max="365"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.appointment.advanceBookingDays}
-                        onChange={(e) => updateSettings('appointment', 'advanceBookingDays', parseInt(e.target.value))}
+                        value={settings.backup.backupRetention || 30}
+                        onChange={(e) => updateSettings('backup', 'backupRetention', parseInt(e.target.value))}
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Cancellation Deadline (hours)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="72"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.appointment.cancellationDeadline}
-                        onChange={(e) => updateSettings('appointment', 'cancellationDeadline', parseInt(e.target.value))}
-                      />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Reschedule Limit per Appointment
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Last Backup
                       </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="10"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.appointment.rescheduleLimit}
-                        onChange={(e) => updateSettings('appointment', 'rescheduleLimit', parseInt(e.target.value))}
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-3 pt-8">
-                      <input
-                        type="checkbox"
-                        id="autoConfirmation"
-                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
-                        checked={settings.appointment.autoConfirmation}
-                        onChange={(e) => updateSettings('appointment', 'autoConfirmation', e.target.checked)}
-                      />
-                      <label htmlFor="autoConfirmation" className="text-sm font-medium text-gray-700">
-                        Auto-confirm Appointments
-                      </label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-600">
+                      {settings.backup.lastBackup ? new Date(settings.backup.lastBackup).toLocaleString() : 'Never'}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Contact Settings */}
-              {activeTab === 'contact' && (
+              {/* Performance Settings */}
+              {activeTab === 'performance' && (
                 <div className="space-y-6">
-                  <h2 className="text-xl font-bold text-gray-900">Contact Information</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Performance Settings</h2>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Support Email
-                      </label>
+                    <div className="flex items-center space-x-3">
                       <input
-                        type="email"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.contact.supportEmail}
-                        onChange={(e) => updateSettings('contact', 'supportEmail', e.target.value)}
+                        type="checkbox"
+                        id="cacheEnabled"
+                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                        checked={settings.performance.cacheEnabled || false}
+                        onChange={(e) => updateSettings('performance', 'cacheEnabled', e.target.checked)}
                       />
+                      <label htmlFor="cacheEnabled" className="text-sm font-medium text-gray-700">
+                        Enable Caching
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="compressionEnabled"
+                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                        checked={settings.performance.compressionEnabled || false}
+                        onChange={(e) => updateSettings('performance', 'compressionEnabled', e.target.checked)}
+                      />
+                      <label htmlFor="compressionEnabled" className="text-sm font-medium text-gray-700">
+                        Enable Compression
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="rateLimiting"
+                        className="w-4 h-4 text-gray-600 border-gray-300 rounded focus:ring-gray-500"
+                        checked={settings.performance.rateLimiting || false}
+                        onChange={(e) => updateSettings('performance', 'rateLimiting', e.target.checked)}
+                      />
+                      <label htmlFor="rateLimiting" className="text-sm font-medium text-gray-700">
+                        Enable Rate Limiting
+                      </label>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Support Phone
+                        Cache Duration (seconds)
                       </label>
                       <input
-                        type="tel"
+                        type="number"
+                        min="60"
+                        max="3600"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        value={settings.contact.supportPhone}
-                        onChange={(e) => updateSettings('contact', 'supportPhone', e.target.value)}
+                        value={settings.performance.cacheDuration || 300}
+                        onChange={(e) => updateSettings('performance', 'cacheDuration', parseInt(e.target.value))}
                       />
-                    </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Office Address
+                        Rate Limit (requests/window)
                     </label>
-                    <textarea
-                      rows={3}
+                      <input
+                        type="number"
+                        min="10"
+                        max="1000"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                      value={settings.contact.address}
-                      onChange={(e) => updateSettings('contact', 'address', e.target.value)}
+                        value={settings.performance.rateLimit || 100}
+                        onChange={(e) => updateSettings('performance', 'rateLimit', parseInt(e.target.value))}
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Working Hours
+                        Rate Limit Window (minutes)
                     </label>
                     <input
-                      type="text"
+                        type="number"
+                        min="1"
+                        max="60"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                      value={settings.contact.workingHours}
-                      onChange={(e) => updateSettings('contact', 'workingHours', e.target.value)}
+                        value={settings.performance.rateLimitWindow || 15}
+                        onChange={(e) => updateSettings('performance', 'rateLimitWindow', parseInt(e.target.value))}
                     />
+                    </div>
                   </div>
                 </div>
               )}

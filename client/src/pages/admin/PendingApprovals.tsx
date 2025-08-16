@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/layout/AdminLayout';
 import { 
-  Clock, 
   CheckCircle, 
   XCircle, 
   User, 
@@ -9,11 +8,8 @@ import {
   FileText, 
   Building2,
   Search,
-  Filter,
   Eye,
-  AlertCircle,
-  Phone,
-  Mail
+  AlertCircle
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -34,8 +30,15 @@ interface PendingAppointment {
     _id: string;
     name: string;
     code: string;
-    processingTime: number;
-    fees: number;
+    processingTime: {
+      estimatedDays: number;
+      description: string;
+    };
+    fees: {
+      amount: number;
+      currency: string;
+      description: string;
+    };
   };
   department: {
     _id: string;
@@ -43,7 +46,7 @@ interface PendingAppointment {
     code: string;
   };
   appointmentDate: string;
-  timeSlot: string;
+  appointmentTime: string;
   status: string;
   notes: {
     citizen?: string;
@@ -67,6 +70,9 @@ export const PendingApprovals = () => {
   const [selectedAppointment, setSelectedAppointment] = useState<PendingAppointment | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectionError, setRejectionError] = useState(false);
 
   useEffect(() => {
     fetchPendingAppointments();
@@ -109,119 +115,8 @@ export const PendingApprovals = () => {
       
     } catch (error) {
       console.error('Error fetching appointments:', error);
-      
-      // Only show mock data if API fails completely
-      console.log('API failed, showing mock data for demonstration');
-      setAppointments([
-          {
-            _id: '1',
-            appointmentNumber: 'APT-2024-001234',
-            citizen: {
-              _id: 'c1',
-              firstName: 'Kasun',
-              lastName: 'Perera',
-              email: 'kasun.perera@email.com',
-              phoneNumber: '077-1234567',
-              nic: '199512345678'
-            },
-            service: {
-              _id: 's1',
-              name: 'Driving License Renewal',
-              code: 'DLR-001',
-              processingTime: 3,
-              fees: 2500
-            },
-            department: {
-              _id: 'd1',
-              name: 'Department of Motor Traffic',
-              code: 'DMT'
-            },
-            appointmentDate: '2024-12-20',
-            timeSlot: '10:00 AM',
-            status: 'pending',
-            notes: {
-              citizen: 'Need urgent renewal for job requirements'
-            },
-            documents: [
-              { name: 'Current License.pdf', url: '/docs/license1.pdf', uploadedAt: '2024-12-15' },
-              { name: 'Medical Certificate.pdf', url: '/docs/medical1.pdf', uploadedAt: '2024-12-15' }
-            ],
-            createdAt: '2024-12-15T10:30:00Z',
-            priority: 'high'
-          },
-          {
-            _id: '2',
-            appointmentNumber: 'APT-2024-001235',
-            citizen: {
-              _id: 'c2',
-              firstName: 'Nimali',
-              lastName: 'Silva',
-              email: 'nimali.silva@email.com',
-              phoneNumber: '076-9876543',
-              nic: '198812345678'
-            },
-            service: {
-              _id: 's2',
-              name: 'Birth Certificate',
-              code: 'BC-001',
-              processingTime: 7,
-              fees: 500
-            },
-            department: {
-              _id: 'd2',
-              name: 'Registrar General\'s Department',
-              code: 'RGD'
-            },
-            appointmentDate: '2024-12-21',
-            timeSlot: '2:00 PM',
-            status: 'pending',
-            notes: {
-              citizen: 'Required for passport application'
-            },
-            documents: [
-              { name: 'Hospital Birth Record.pdf', url: '/docs/birth1.pdf', uploadedAt: '2024-12-16' }
-            ],
-            createdAt: '2024-12-16T14:20:00Z',
-            priority: 'medium'
-          },
-          {
-            _id: '3',
-            appointmentNumber: 'APT-2024-001236',
-            citizen: {
-              _id: 'c3',
-              firstName: 'Rohan',
-              lastName: 'Fernando',
-              email: 'rohan.fernando@email.com',
-              phoneNumber: '071-5555555',
-              nic: '199012345678'
-            },
-            service: {
-              _id: 's3',
-              name: 'Passport Application',
-              code: 'PA-001',
-              processingTime: 14,
-              fees: 3500
-            },
-            department: {
-              _id: 'd3',
-              name: 'Immigration and Emigration',
-              code: 'IE'
-            },
-            appointmentDate: '2024-12-22',
-            timeSlot: '11:30 AM',
-            status: 'pending',
-            notes: {
-              citizen: 'First time passport application for overseas employment'
-            },
-            documents: [
-              { name: 'Birth Certificate.pdf', url: '/docs/birth2.pdf', uploadedAt: '2024-12-17' },
-              { name: 'NIC Copy.pdf', url: '/docs/nic1.pdf', uploadedAt: '2024-12-17' },
-              { name: 'Employment Letter.pdf', url: '/docs/employment1.pdf', uploadedAt: '2024-12-17' }
-            ],
-            createdAt: '2024-12-17T09:15:00Z',
-            priority: 'urgent'
-          }
-        ]);
+      // Show empty state if API fails
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
@@ -232,48 +127,103 @@ export const PendingApprovals = () => {
     try {
       const token = localStorage.getItem('govconnect_token');
       
-      // Try to update via API
-      try {
-        await axios.patch(`${API_BASE_URL}/appointments/${appointmentId}`, 
-          { status: 'confirmed' }, 
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      } catch (apiError) {
-        console.log('API update failed, updating locally');
-      }
+      // Update via API
+      const response = await axios.patch(`${API_BASE_URL}/appointments/${appointmentId}`, 
+        { status: 'confirmed' }, 
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       
-      // Always update the UI
-      setAppointments(prev => prev.filter(apt => apt._id !== appointmentId));
-      setShowModal(false);
-      setSelectedAppointment(null);
+      if (response.data.success) {
+        // Update the UI with the confirmed data
+        setAppointments(prev => prev.filter(apt => apt._id !== appointmentId));
+        setShowModal(false);
+        setSelectedAppointment(null);
+        
+        // Fetch updated pending appointments to refresh the list
+        await fetchPendingAppointments();
+      } else {
+        console.error('API returned error:', response.data);
+        alert('Failed to approve appointment. Please try again.');
+      }
     } catch (error) {
       console.error('Error approving appointment:', error);
+      alert('Error approving appointment. Please try again.');
     } finally {
       setProcessing(false);
     }
   };
 
+  const openRejectModal = () => {
+    if (!selectedAppointment) {
+      console.error("No appointment selected");
+      return;
+    }
+    
+    // Reset rejection form
+    setRejectionReason('');
+    setRejectionError(false);
+    
+    // Switch to rejection mode
+    setIsRejecting(true);
+    
+    // Debug logs to track state changes
+    console.log('Switching to rejection mode, isRejecting set to true');
+    
+    // Force a re-render to ensure the UI updates
+    setTimeout(() => {
+      const rejectTextarea = document.getElementById('rejectionReason');
+      if (rejectTextarea) {
+        rejectTextarea.focus();
+        console.log('Found and focused rejection textarea');
+      } else {
+        console.error('Could not find rejection textarea');
+      }
+    }, 100);
+  };
+
   const handleReject = async (appointmentId: string) => {
+    // Check if rejection reason is empty
+    if (!rejectionReason.trim()) {
+      setRejectionError(true);
+      document.getElementById('rejectionReason')?.focus();
+      return;
+    }
+    
+    // Clear any previous error
+    setRejectionError(false);
+    
     setProcessing(true);
     try {
       const token = localStorage.getItem('govconnect_token');
       
-      // Try to update via API
-      try {
-        await axios.patch(`${API_BASE_URL}/appointments/${appointmentId}`, 
-          { status: 'cancelled' }, 
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      } catch (apiError) {
-        console.log('API update failed, updating locally');
-      }
+      // Update via API with rejection reason
+      const response = await axios.patch(`${API_BASE_URL}/appointments/${appointmentId}`, 
+        { 
+          status: 'cancelled',
+          notes: { 
+            officer: rejectionReason 
+          }
+        }, 
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       
-      // Always update the UI
-      setAppointments(prev => prev.filter(apt => apt._id !== appointmentId));
-      setShowModal(false);
-      setSelectedAppointment(null);
+      if (response.data.success) {
+        // Update the UI with the cancelled data
+        setAppointments(prev => prev.filter(apt => apt._id !== appointmentId));
+        setShowModal(false);
+        setIsRejecting(false);
+        setSelectedAppointment(null);
+        setRejectionReason('');
+        
+        // Fetch updated pending appointments to refresh the list
+        await fetchPendingAppointments();
+      } else {
+        console.error('API returned error:', response.data);
+        alert('Failed to reject appointment. Please try again.');
+      }
     } catch (error) {
       console.error('Error rejecting appointment:', error);
+      alert('Error rejecting appointment. Please try again.');
     } finally {
       setProcessing(false);
     }
@@ -404,7 +354,7 @@ export const PendingApprovals = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           <Calendar size={16} />
-                          <span>{new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.timeSlot}</span>
+                          <span>{new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.appointmentTime}</span>
                         </div>
                       </div>
 
@@ -413,7 +363,7 @@ export const PendingApprovals = () => {
                         <span>•</span>
                         <span>{appointment.documents.length} documents</span>
                         <span>•</span>
-                        <span>Requested {new Date(appointment.createdAt).toLocaleDateString()}</span>
+                        <span>Requested {new Date(appointment.createdAt).toLocaleString()}</span>
                       </div>
 
                       {appointment.notes.citizen && (
@@ -430,6 +380,7 @@ export const PendingApprovals = () => {
                     <button
                       onClick={() => {
                         setSelectedAppointment(appointment);
+                        setIsRejecting(false); // Ensure we start in details view mode
                         setShowModal(true);
                       }}
                       className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
@@ -445,7 +396,11 @@ export const PendingApprovals = () => {
                       Approve
                     </button>
                     <button
-                      onClick={() => handleReject(appointment._id)}
+                      onClick={() => {
+                        setSelectedAppointment(appointment);
+                        setIsRejecting(true); // Directly open in rejection mode
+                        setShowModal(true);
+                      }}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                     >
                       <XCircle size={16} className="inline mr-1" />
@@ -473,9 +428,14 @@ export const PendingApprovals = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-900">Appointment Details</h3>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {isRejecting ? 'Reject Appointment' : 'Appointment Details'}
+                </h3>
                 <button
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setIsRejecting(false);
+                  }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <XCircle size={24} />
@@ -484,98 +444,192 @@ export const PendingApprovals = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Citizen Information */}
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Citizen Information</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Name:</span>
-                    <p className="font-medium">{selectedAppointment.citizen.firstName} {selectedAppointment.citizen.lastName}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">NIC:</span>
-                    <p className="font-medium">{selectedAppointment.citizen.nic}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Email:</span>
-                    <p className="font-medium">{selectedAppointment.citizen.email}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Phone:</span>
-                    <p className="font-medium">{selectedAppointment.citizen.phoneNumber}</p>
-                  </div>
-                </div>
+              {/* Debug info */}
+              <div className="text-xs text-gray-400 mb-2">
+                Mode: {isRejecting ? 'Rejection Form' : 'Appointment Details'}
               </div>
-
-              {/* Service Information */}
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Service Information</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+              
+              {!isRejecting ? (
+                <>
+                  {/* Citizen Information */}
                   <div>
-                    <span className="text-gray-600">Service:</span>
-                    <p className="font-medium">{selectedAppointment.service.name}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Department:</span>
-                    <p className="font-medium">{selectedAppointment.department.name}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Processing Time:</span>
-                    <p className="font-medium">{selectedAppointment.service.processingTime} days</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Fees:</span>
-                    <p className="font-medium">LKR {selectedAppointment.service.fees.toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Documents */}
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Submitted Documents</h4>
-                <div className="space-y-2">
-                  {selectedAppointment.documents.map((doc, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <FileText size={20} className="text-blue-600" />
-                        <div>
-                          <p className="font-medium text-sm">{doc.name}</p>
-                          <p className="text-xs text-gray-500">Uploaded {new Date(doc.uploadedAt).toLocaleDateString()}</p>
-                        </div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Citizen Information</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Name:</span>
+                        <p className="font-medium">{selectedAppointment.citizen.firstName} {selectedAppointment.citizen.lastName}</p>
                       </div>
-                      <button className="text-blue-600 hover:text-blue-800 text-sm">
-                        View
-                      </button>
+                      <div>
+                        <span className="text-gray-600">NIC:</span>
+                        <p className="font-medium">{selectedAppointment.citizen.nic}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Email:</span>
+                        <p className="font-medium">{selectedAppointment.citizen.email}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Phone:</span>
+                        <p className="font-medium">{selectedAppointment.citizen.phoneNumber}</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                  
+                  {/* Appointment Time Information */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Appointment Details</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Appointment Date:</span>
+                        <p className="font-medium">{new Date(selectedAppointment.appointmentDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Appointment Time:</span>
+                        <p className="font-medium">{selectedAppointment.appointmentTime}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Request Submitted:</span>
+                        <p className="font-medium">{new Date(selectedAppointment.createdAt).toLocaleString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Appointment ID:</span>
+                        <p className="font-medium">{selectedAppointment.appointmentNumber}</p>
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Actions */}
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleReject(selectedAppointment._id)}
-                  disabled={processing}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                >
-                  <XCircle size={20} className="inline mr-1" />
-                  Reject
-                </button>
-                <button
-                  onClick={() => handleApprove(selectedAppointment._id)}
-                  disabled={processing}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  <CheckCircle size={20} className="inline mr-1" />
-                  Approve
-                </button>
-              </div>
+                  {/* Service Information */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Service Information</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Service:</span>
+                        <p className="font-medium">{selectedAppointment.service.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Department:</span>
+                        <p className="font-medium">{selectedAppointment.department.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Processing Time:</span>
+                        <p className="font-medium">{selectedAppointment.service.processingTime.estimatedDays} days</p>
+                        {selectedAppointment.service.processingTime.description && (
+                          <p className="text-xs text-gray-500">{selectedAppointment.service.processingTime.description}</p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Fees:</span>
+                        <p className="font-medium">{selectedAppointment.service.fees.currency} {selectedAppointment.service.fees.amount.toLocaleString()}</p>
+                        {selectedAppointment.service.fees.description && (
+                          <p className="text-xs text-gray-500">{selectedAppointment.service.fees.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Documents */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Submitted Documents</h4>
+                    <div className="space-y-2">
+                      {selectedAppointment.documents.map((doc, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <FileText size={20} className="text-blue-600" />
+                            <div>
+                              <p className="font-medium text-sm">{doc.name}</p>
+                              <p className="text-xs text-gray-500">Uploaded {new Date(doc.uploadedAt).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <button className="text-blue-600 hover:text-blue-800 text-sm">
+                            View
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+                    <button
+                      onClick={() => setShowModal(false)}
+                      className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Reject button clicked');
+                        openRejectModal();
+                      }}
+                      disabled={processing}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                    >
+                      <XCircle size={20} className="inline mr-1" />
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => handleApprove(selectedAppointment._id)}
+                      disabled={processing}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      <CheckCircle size={20} className="inline mr-1" />
+                      Approve
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Rejection Form */}
+                  <p className="text-gray-700">
+                    Please provide a reason for rejecting this appointment request from {selectedAppointment.citizen.firstName} {selectedAppointment.citizen.lastName}.
+                  </p>
+                  
+                  <div>
+                    <label htmlFor="rejectionReason" className="block text-sm font-medium text-gray-700 mb-1">
+                      Rejection Reason <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      id="rejectionReason"
+                      value={rejectionReason}
+                      onChange={(e) => {
+                        setRejectionReason(e.target.value);
+                        if (e.target.value.trim()) {
+                          setRejectionError(false);
+                        }
+                      }}
+                      placeholder="Please provide a detailed reason for rejection..."
+                      className={`w-full px-3 py-2 border ${rejectionError ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]`}
+                      autoFocus
+                    />
+                    {rejectionError && (
+                      <p className="mt-1 text-sm text-red-600">Please provide a reason for rejection</p>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => setIsRejecting(false)}
+                      className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => handleReject(selectedAppointment._id)}
+                      disabled={processing || !rejectionReason.trim()}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                    >
+                      {processing ? 'Processing...' : 'Confirm Rejection'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

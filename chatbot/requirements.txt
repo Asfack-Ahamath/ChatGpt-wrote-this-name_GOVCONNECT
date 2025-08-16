@@ -1,0 +1,31 @@
+# Minimal requirements for GovConnect Chatbot
+# Use this if you encounter dependency conflicts with requirements.txt
+
+# Core Flask dependencies
+Flask
+flask-cors
+python-dotenv
+
+# LangChain core (install these first)
+langchain
+langchain-community
+sentence-transformers
+transformers
+torch
+tokenizers
+
+# Vector store
+faiss-cpu
+
+# Document processing
+unstructured[md]
+
+# HTTP requests
+requests
+
+# Additional ML dependencies
+numpy
+scipy
+
+# HuggingFace integration (install after the above)
+langchain-huggingface

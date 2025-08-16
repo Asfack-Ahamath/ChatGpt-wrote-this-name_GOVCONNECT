@@ -417,4 +417,205 @@ router.get('/appointments', [auth, requireAdmin], async (req, res) => {
   }
 });
 
+// System Settings endpoints
+router.get('/settings', [auth, requireAdmin], async (req, res) => {
+  try {
+    // This would typically come from a SystemSettings model
+    // For now, we'll return mock settings data
+    const settings = {
+      general: {
+        systemName: 'GOVCONNECT',
+        systemDescription: 'Sri Lanka Government Services Portal',
+        systemVersion: '1.0.0',
+        systemLogo: '/assets/logo.png',
+        timezone: 'Asia/Colombo',
+        defaultLanguage: 'english',
+        supportedLanguages: ['english', 'sinhala', 'tamil'],
+        maintenanceMode: false,
+        registrationEnabled: true,
+        emailVerificationRequired: true
+      },
+      appointment: {
+        maxAdvanceBookingDays: 30,
+        minAdvanceBookingHours: 2,
+        defaultAppointmentDuration: 30,
+        allowRescheduling: true,
+        rescheduleLimit: 3,
+        cancellationDeadlineHours: 24,
+        autoConfirmAppointments: false,
+        reminderNotifications: true,
+        reminderHoursBefore: [24, 2]
+      },
+      notification: {
+        emailNotifications: true,
+        smsNotifications: false,
+        pushNotifications: true,
+        emailProvider: 'smtp',
+        smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+        smtpPort: process.env.SMTP_PORT || 587,
+        smtpSecure: false,
+        smtpUser: process.env.SMTP_USER || '',
+        smtpPassword: '[HIDDEN]'
+      },
+      security: {
+        passwordMinLength: 8,
+        passwordRequireUppercase: true,
+        passwordRequireLowercase: true,
+        passwordRequireNumbers: true,
+        passwordRequireSymbols: false,
+        sessionTimeout: 24,
+        maxLoginAttempts: 5,
+        lockoutDuration: 30,
+        twoFactorAuth: false,
+        ipWhitelisting: false,
+        auditLogging: true
+      },
+      backup: {
+        autoBackup: true,
+        backupFrequency: 'daily',
+        backupRetention: 30,
+        backupLocation: 'local',
+        lastBackup: new Date(Date.now() - 24 * 60 * 60 * 1000) // 24 hours ago
+      },
+      performance: {
+        cacheEnabled: true,
+        cacheDuration: 300,
+        compressionEnabled: true,
+        rateLimiting: true,
+        rateLimit: 100,
+        rateLimitWindow: 15
+      }
+    };
+
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    console.error('Error fetching system settings:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update system settings
+router.put('/settings', [auth, requireAdmin], async (req, res) => {
+  try {
+    const { category, settings } = req.body;
+    
+    // Validate category
+    const validCategories = ['general', 'appointment', 'notification', 'security', 'backup', 'performance'];
+    if (!validCategories.includes(category)) {
+      return res.status(400).json({ error: 'Invalid settings category' });
+    }
+
+    // In a real implementation, you would update the SystemSettings model
+    // For now, we'll just return success with the updated settings
+    console.log(`Updating ${category} settings:`, settings);
+
+    // Hide sensitive information in response
+    const responseSettings = { ...settings };
+    if (category === 'notification' && responseSettings.smtpPassword) {
+      responseSettings.smtpPassword = '[HIDDEN]';
+    }
+
+    res.json({
+      success: true,
+      message: `${category.charAt(0).toUpperCase() + category.slice(1)} settings updated successfully`,
+      data: responseSettings
+    });
+  } catch (error) {
+    console.error('Error updating system settings:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Test email configuration
+router.post('/settings/test-email', [auth, requireAdmin], async (req, res) => {
+  try {
+    const { testEmail } = req.body;
+    
+    if (!testEmail) {
+      return res.status(400).json({ error: 'Test email address is required' });
+    }
+
+    // In a real implementation, you would send a test email
+    console.log(`Sending test email to: ${testEmail}`);
+    
+    // Simulate email sending delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    res.json({
+      success: true,
+      message: 'Test email sent successfully'
+    });
+  } catch (error) {
+    console.error('Error sending test email:', error);
+    res.status(500).json({ error: 'Failed to send test email' });
+  }
+});
+
+// System backup endpoints
+router.post('/settings/backup', [auth, requireAdmin], async (req, res) => {
+  try {
+    // In a real implementation, you would create a system backup
+    console.log('Creating system backup...');
+    
+    // Simulate backup creation delay
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const backup = {
+      id: Date.now().toString(),
+      filename: `govconnect-backup-${new Date().toISOString().split('T')[0]}.sql`,
+      size: '2.3 MB',
+      createdAt: new Date(),
+      type: 'manual'
+    };
+
+    res.json({
+      success: true,
+      message: 'Backup created successfully',
+      data: backup
+    });
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    res.status(500).json({ error: 'Failed to create backup' });
+  }
+});
+
+// Get system info
+router.get('/settings/system-info', [auth, requireAdmin], async (req, res) => {
+  try {
+    const systemInfo = {
+      server: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        uptime: Math.floor(process.uptime()),
+        memory: {
+          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+        }
+      },
+      database: {
+        status: 'connected',
+        host: process.env.MONGODB_URI ? 'MongoDB Atlas' : 'localhost',
+        collections: 5 // This would be dynamic in a real implementation
+      },
+      application: {
+        name: 'GOVCONNECT',
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        startTime: new Date(Date.now() - process.uptime() * 1000)
+      }
+    };
+
+    res.json({
+      success: true,
+      data: systemInfo
+    });
+  } catch (error) {
+    console.error('Error fetching system info:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

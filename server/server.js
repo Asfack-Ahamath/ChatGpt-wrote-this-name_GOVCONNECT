@@ -21,6 +21,47 @@ const PORT = config.port;
 console.log('Starting server setup...');
 console.log('Port:', PORT);
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const method = req.method;
+  const url = req.originalUrl;
+  const ip = req.ip || req.connection.remoteAddress;
+  
+  console.log(`🔵 [${timestamp}] ${method} ${url} - IP: ${ip}`);
+  
+  // Log request body for POST/PUT/PATCH requests (excluding sensitive data)
+  if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    const body = { ...req.body };
+    // Remove sensitive fields from logs
+    if (body.password) body.password = '[HIDDEN]';
+    if (body.token) body.token = '[HIDDEN]';
+    console.log(`📝 Request Body:`, JSON.stringify(body, null, 2));
+  }
+  
+  // Log query parameters
+  if (Object.keys(req.query).length > 0) {
+    console.log(`🔍 Query Params:`, JSON.stringify(req.query, null, 2));
+  }
+  
+  // Log response when it finishes
+  const originalSend = res.send;
+  res.send = function(data) {
+    const responseTime = Date.now() - req.startTime;
+    console.log(`🟢 [${timestamp}] ${method} ${url} - Status: ${res.statusCode} - Time: ${responseTime}ms`);
+    
+    // Log error responses
+    if (res.statusCode >= 400) {
+      console.log(`❌ Error Response:`, data);
+    }
+    
+    originalSend.call(this, data);
+  };
+  
+  req.startTime = Date.now();
+  next();
+});
+
 // Middleware
 app.use(helmet());
 app.use(cors(config.cors));
@@ -40,6 +81,17 @@ app.get('/test', (req, res) => {
   res.json({
     message: 'Test route working',
     timestamp: new Date().toISOString()
+  });
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'GOVCONNECT API is healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 

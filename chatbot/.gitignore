@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary files
+temp/
+tmp/
+.temp/
+.tmp/
+
+# Test files (but keep test_env.py)
+test_*.py
+!test_env.py
+tests/
+coverage/
+.coverage
+htmlcov/
+
+# Documentation
+docs/_build/
+docs/build/
+site/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Local development
+local_settings.py
+local_*.py
+
+# Backup files
+*.bak
+*.backup
+*~
+*.swp
+*.old
+
+# System Files
+.DS_Store
+Thumbs.db
+desktop.ini

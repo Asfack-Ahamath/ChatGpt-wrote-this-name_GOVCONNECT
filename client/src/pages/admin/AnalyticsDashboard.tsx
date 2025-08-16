@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/layout/AdminLayout';
+import { FeedbackAnalytics } from '../../components/admin/FeedbackAnalytics';
 import { 
   BarChart3, 
   TrendingUp, 
   Users, 
   Calendar, 
   Clock,
-  CheckCircle,
-  XCircle,
   AlertCircle,
   Building2,
-  FileText,
-  Download
+  Download,
+  MessageSquare
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -63,8 +62,8 @@ interface AnalyticsData {
     name: string;
     count: number;
     department: string;
-    avgRating: number;
-    completionRate: number;
+    avgRating: string;
+    completionRate: string;
   }>;
   userGrowth: Array<{
     month: string;
@@ -91,6 +90,7 @@ export const AnalyticsDashboard = () => {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30days');
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     fetchAnalytics();
@@ -188,7 +188,7 @@ export const AnalyticsDashboard = () => {
           { status: 'pending', count: realData.overview?.pendingAppointments || 89, percentage: 5.9, color: 'bg-amber-500' },
           { status: 'rescheduled', count: 27, percentage: 1.9, color: 'bg-purple-500' }
         ],
-        appointmentsByDepartment: realData.departments?.map((dept: any, index: number) => ({
+        appointmentsByDepartment: realData.departments?.map((dept: any) => ({
           _id: dept._id,
           name: dept.name,
           count: Math.floor(Math.random() * 200) + 50,
@@ -225,7 +225,7 @@ export const AnalyticsDashboard = () => {
             pending: Math.floor(Math.random() * 8) + 1
           };
         }),
-        topServices: realData.services?.slice(0, 10).map((service: any, index: number) => ({
+        topServices: realData.services?.slice(0, 10).map((service: any) => ({
           _id: service._id,
           name: service.name,
           count: Math.floor(Math.random() * 150) + 50,
@@ -421,8 +421,45 @@ export const AnalyticsDashboard = () => {
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="container mx-auto px-4">
+          <div className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'overview'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <BarChart3 size={16} />
+                <span>Overview</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('feedback')}
+              className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'feedback'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <MessageSquare size={16} />
+                <span>Feedback Analytics</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="container mx-auto px-4 py-8">
-        {/* Enhanced Overview Cards */}
+        {/* Tab Content */}
+        {activeTab === 'overview' ? (
+          <>
+            {/* Enhanced Overview Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6 mb-12">
           <div className="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-slate-200/50 hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
@@ -535,7 +572,7 @@ export const AnalyticsDashboard = () => {
               {analytics.appointmentsByDepartment.map((item, index) => (
                 <div key={index}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-900">{item.department}</span>
+                    <span className="font-medium text-gray-900">{item.name}</span>
                     <span className="text-gray-600">{item.count}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -579,7 +616,7 @@ export const AnalyticsDashboard = () => {
               {analytics.topServices.map((item, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div>
-                    <p className="font-medium text-gray-900">{item.service}</p>
+                    <p className="font-medium text-gray-900">{item.name}</p>
                     <p className="text-sm text-gray-600">{item.department}</p>
                   </div>
                   <div className="text-right">
@@ -620,6 +657,11 @@ export const AnalyticsDashboard = () => {
             </div>
           </div>
         </div>
+          </>
+        ) : (
+          /* Feedback Analytics Tab */
+          <FeedbackAnalytics />
+        )}
       </div>
     </AdminLayout>
   );
