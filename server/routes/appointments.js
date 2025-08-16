@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const QRCode = require('qrcode');
+const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Service = require('../models/Service');
@@ -18,21 +19,21 @@ router.get('/', auth, async (req, res) => {
     }
 
     const { status, department, limit = 100, page = 1 } = req.query;
-    
+
     let query = {};
-    
+
     // Filter by status if provided
     if (status) {
       query.status = status;
     }
-    
+
     // Filter by department if provided
     if (department) {
       query.department = department;
     }
-    
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     const appointments = await Appointment.find(query)
       .populate('citizen', 'firstName lastName email phoneNumber nic')
       .populate('service', 'name code processingTime fees')
@@ -41,9 +42,9 @@ router.get('/', auth, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
-    
+
     const totalCount = await Appointment.countDocuments(query);
-    
+
     res.json({
       success: true,
       data: appointments,
@@ -56,9 +57,9 @@ router.get('/', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching appointments:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch appointments' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch appointments'
     });
   }
 });
@@ -68,8 +69,8 @@ router.get('/available-slots', auth, async (req, res) => {
     const { serviceId, date, departmentId } = req.query;
 
     if (!serviceId || !date) {
-      return res.status(400).json({ 
-        error: 'Service ID and date are required' 
+      return res.status(400).json({
+        error: 'Service ID and date are required'
       });
     }
 
@@ -83,17 +84,17 @@ router.get('/available-slots', auth, async (req, res) => {
     today.setHours(0, 0, 0, 0);
 
     if (selectedDate < today) {
-      return res.status(400).json({ 
-        error: 'Cannot book appointments for past dates' 
+      return res.status(400).json({
+        error: 'Cannot book appointments for past dates'
       });
     }
 
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + service.maxAdvanceBookingDays);
-    
+
     if (selectedDate > maxDate) {
-      return res.status(400).json({ 
-        error: `Cannot book appointments more than ${service.maxAdvanceBookingDays} days in advance` 
+      return res.status(400).json({
+        error: `Cannot book appointments more than ${service.maxAdvanceBookingDays} days in advance`
       });
     }
 
@@ -170,8 +171,8 @@ router.post('/book', auth, [
     });
 
     if (existingAppointment) {
-      return res.status(409).json({ 
-        error: 'This time slot is already booked' 
+      return res.status(409).json({
+        error: 'This time slot is already booked'
       });
     }
 
@@ -217,6 +218,63 @@ router.post('/book', auth, [
       .populate('department', 'name location contactInfo')
       .populate('citizen', 'firstName lastName email phoneNumber nic');
 
+    // Send confirmation email
+    let notificationStatus = 'sent';
+    let notificationMessage = 'Appointment confirmation email';
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: false, // Use true for port 465, false for 587
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+
+      const mailOptions = {
+        from: process.env.EMAIL_FROM,
+        to: populatedAppointment.citizen.email,
+        subject: `Appointment Confirmation: ${populatedAppointment.appointmentNumber}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="color: #333;">Appointment Confirmed!</h2>
+            <p>Dear ${populatedAppointment.citizen.firstName} ${populatedAppointment.citizen.lastName},</p>
+            <p>Your appointment has been successfully booked. Here are the details:</p>
+            <ul>
+              <li><strong>Appointment Number:</strong> ${populatedAppointment.appointmentNumber}</li>
+              <li><strong>Service:</strong> ${populatedAppointment.service.name}</li>
+              <li><strong>Date:</strong> ${new Date(populatedAppointment.appointmentDate).toLocaleDateString()}</li>
+              <li><strong>Time:</strong> ${populatedAppointment.appointmentTime}</li>
+              <li><strong>Department:</strong> ${populatedAppointment.department.name}</li>
+              <li><strong>Location:</strong> ${populatedAppointment.department.location.address}, ${populatedAppointment.department.location.city}</li>
+              <li><strong>Fee:</strong> LKR ${populatedAppointment.service.fees.amount.toLocaleString()}</li>
+            </ul>
+            <p><strong>QR Code for Check-in:</strong></p>
+            <img src="${populatedAppointment.qrCode}" alt="QR Code" style="width: 200px; height: 200px;" />
+            <p>Please bring all required documents as listed in the service details. You'll receive a reminder 24 hours before your appointment.</p>
+            <p>If you need to cancel or reschedule, log in to your dashboard.</p>
+            <p>Thank you,<br>Government Services Portal</p>
+          </div>
+        `
+      };
+
+      await transporter.sendMail(mailOptions);
+    } catch (emailError) {
+      console.error('Email sending error:', emailError);
+      notificationStatus = 'failed';
+      notificationMessage = `Appointment confirmation email failed: ${emailError.message}`;
+    }
+
+    // Log the notification in the schema
+    populatedAppointment.notifications.push({
+      type: 'email',
+      sentAt: new Date(),
+      status: notificationStatus,
+      message: notificationMessage
+    });
+    await populatedAppointment.save();
+
     res.status(201).json({
       success: true,
       message: 'Appointment booked successfully',
@@ -224,22 +282,22 @@ router.post('/book', auth, [
     });
   } catch (error) {
     console.error('Book appointment error:', error);
-    
+
     // Handle specific error types
     if (error.name === 'ValidationError') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Validation error',
-        details: error.message 
+        details: error.message
       });
     }
-    
+
     if (error.code === 11000) {
-      return res.status(409).json({ 
-        error: 'Duplicate booking detected' 
+      return res.status(409).json({
+        error: 'Duplicate booking detected'
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Server error while booking appointment',
       message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
@@ -288,8 +346,8 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    if (appointment.citizen._id.toString() !== req.user._id.toString() && 
-        req.user.role !== 'officer' && req.user.role !== 'admin') {
+    if (appointment.citizen._id.toString() !== req.user._id.toString() &&
+      req.user.role !== 'officer' && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -313,7 +371,7 @@ router.put('/:id/cancel', auth, [
     }
 
     const appointment = await Appointment.findById(req.params.id);
-    
+
     if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
@@ -323,8 +381,8 @@ router.put('/:id/cancel', auth, [
     }
 
     if (!['pending', 'confirmed'].includes(appointment.status)) {
-      return res.status(400).json({ 
-        error: 'Can only cancel pending or confirmed appointments' 
+      return res.status(400).json({
+        error: 'Can only cancel pending or confirmed appointments'
       });
     }
 
@@ -360,29 +418,29 @@ router.patch('/:id', auth, [
     }
 
     const appointment = await Appointment.findById(req.params.id);
-    
+
     if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
     const { status, notes } = req.body;
-    
+
     // Update appointment
     appointment.status = status;
-    
+
     // If officer notes provided, update them
     if (notes && notes.officer) {
       appointment.notes.officer = notes.officer;
     }
-    
+
     // If status is being changed to confirmed/completed, assign the officer
     if (['confirmed', 'completed'].includes(status) && req.user.role === 'officer') {
       appointment.officer = req.user._id;
     }
-    
+
     // Save the updated appointment
     await appointment.save();
-    
+
     // Return the updated appointment with populated fields
     const updatedAppointment = await Appointment.findById(req.params.id)
       .populate('service', 'name code description processingTime fees')
@@ -405,21 +463,21 @@ function generateTimeSlots(startTime, endTime, duration) {
   const slots = [];
   const start = parseTime(startTime);
   const end = parseTime(endTime);
-  
+
   let current = start;
   while (current + duration <= end) {
     const timeStr = formatTime(current);
     const endTimeStr = formatTime(current + duration);
-    
+
     slots.push({
       time: timeStr,
       endTime: endTimeStr,
       display: `${timeStr} - ${endTimeStr}`
     });
-    
+
     current += duration;
   }
-  
+
   return slots;
 }
 
@@ -492,7 +550,7 @@ router.post('/:id/feedback', auth, [
     });
   } catch (error) {
     console.error('Submit feedback error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Server error while submitting feedback',
       message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
@@ -508,7 +566,7 @@ router.get('/feedback/stats', auth, async (req, res) => {
     }
 
     const { department, service, startDate, endDate } = req.query;
-    
+
     // Build match query
     let matchQuery = {
       'feedback.rating': { $exists: true, $ne: null },
@@ -602,7 +660,7 @@ router.get('/feedback/stats', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Get feedback stats error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Server error while fetching feedback statistics',
       message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
@@ -618,7 +676,7 @@ router.get('/feedback/recent', auth, async (req, res) => {
     }
 
     const { limit = 10, department } = req.query;
-    
+
     let matchQuery = {
       'feedback.rating': { $exists: true, $ne: null },
       status: 'completed'
@@ -643,7 +701,7 @@ router.get('/feedback/recent', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Get recent feedback error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Server error while fetching recent feedback',
       message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });

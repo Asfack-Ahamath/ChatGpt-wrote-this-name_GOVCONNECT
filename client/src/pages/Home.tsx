@@ -12,6 +12,8 @@ import {
   Globe
 } from 'lucide-react';
 
+import { ChatbotButton } from '../components/chatbot_button';
+
 export const Home = () => {
   const { user } = useAuth();
 
@@ -214,6 +216,9 @@ export const Home = () => {
               Show your QR code, complete the process quickly, and provide feedback on your experience.
             </p>
           </div>
+
+        {/* Floating Chatbot */}
+          <ChatbotButton />
         </div>
       </section>
 
