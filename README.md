@@ -98,6 +98,11 @@ NODE_ENV=development
 PORT=5000
 MONGODB_URI=mongodb+srv://root:pass12345@cluster1.f8cotog.mongodb.net/govconnect
 JWT_SECRET=govconnect-secret-key-2024-sri-lanka
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=sayesara2025@gmail.com
+SMTP_PASS=hhmfoltyopznwwnc
+EMAIL_FROM=sayesara2025@gmail.com
 ```
 
 #### Frontend (.env)
