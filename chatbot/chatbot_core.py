@@ -16,10 +16,10 @@ from transformers import AutoTokenizer
 # ===== Configuration =====
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 MODEL_ID = os.getenv("MISTRAL_MODEL_ID", "ft:open-mistral-7b:0ffd4d8a:20250718:0b9abfb2")
-VECTOR_DIR = os.getenv("VECTOR_DIR", "govconnect_nic")
-EMBED_MODEL = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")  # Smaller, faster model
+VECTOR_DIR = os.getenv("VECTOR_DIR", "govconnect_KB")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")  
 DATA_DIR = os.getenv("DATA_DIR", "data")
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "512"))  # Reduced to match model's max length
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "512"))  
 
 # Initialize tokenizer
 try:
@@ -118,22 +118,12 @@ def load_vector_store(vector_dir=None):
     print(f"[DEBUG] Vector store loaded successfully.")
     return db
 
-def retrieve_documents(db, query, top_k=5):
+def retrieve_documents(db, query, top_k=4):
     """Retrieve top matching documents for query."""
     retriever = db.as_retriever(search_kwargs={"k": top_k})
     docs = retriever.invoke(query)
     print(f"[DEBUG] Retrieved {len(docs)} relevant chunks.")
     return docs
-
-def format_context(relevant_docs):
-    """Format retrieved docs into context for LLM."""
-    sections = []
-    for i, doc in enumerate(relevant_docs, 1):
-        file_name = doc.metadata.get("source_file", "unknown")
-        section = doc.metadata.get("section", "General")
-        content = doc.page_content.strip()
-        sections.append(f"[Document {i} - {file_name} | Section: {section}]\n{content}")
-    return "\n\n".join(sections)
 
 def call_mistral_api(query, context):
     """Send query + context to Mistral API."""
@@ -149,26 +139,44 @@ def call_mistral_api(query, context):
     }
     
     system_message = (
-        "You are GovConnect Assistant, a helpful AI assistant specializing in Sri Lankan government services, "
-        "especially National Identity Card (NIC) processes and other government procedures. "
-        "You help citizens navigate government services efficiently.\n\n"
-        
-        "IMPORTANT GUIDELINES:\n"
-        "- Answer questions using ONLY the provided context below\n"
-        "- If the answer is not in the context, say: 'I don't have that specific information in my knowledge base. "
-        "For the most accurate and up-to-date information, please contact the relevant government department directly.'\n"
-        "- Provide clear, step-by-step instructions when applicable\n"
-        "- Be helpful, friendly, and professional\n"
-        "- Include relevant contact information if available in the context\n"
-        "- If asked about services not covered in the context, suggest contacting the appropriate government office\n\n"
-        
-        "CONTEXT:\n"
-        "---\n"
-        f"{context}\n"
-        "---\n\n"
-        
-        "Please provide a helpful response based on the above context."
-    )
+    "You are GovConnect Assistant — a trusted, friendly, and professional AI assistant that helps citizens of Sri Lanka "
+    "with government services. You specialize in:\n"
+    "- National Identity Card (NIC)\n"
+    "- Birth Certificates\n"
+    "- Driver’s Licenses\n"
+    "- Vehicle Registration\n"
+    "- Passports\n"
+    "- Other citizen identity or registration-related services\n\n"
+
+    "INTERACTION MINDFULNESS:\n"
+    "1. If the user greets you (e.g., 'hi', 'hello', 'good morning'), reply briefly with a warm greeting. "
+    "Example: 'Hello! How can I help you today?'\n"
+    "2. If the user makes small talk (e.g., 'how are you?', 'what’s up?'), keep your response short and polite, "
+    "then guide them back: 'I’m doing well, thank you! How can I assist you with government services today?'\n"
+    "3. If the user’s intent is unclear, ask a polite clarifying question instead of giving a long generic answer.\n"
+    "4. If the user asks about a government service (NIC, Birth Certificate, Driver’s License, Vehicle Registration, Passport), "
+    "provide clear, step-by-step guidance using ONLY the provided context.\n"
+    "5. If the user asks something outside of your knowledge base or context, respond: "
+    "'I don't have that specific information in my knowledge base. For the most accurate and up-to-date information, please contact the relevant government department directly.'\n"
+    "6. Always detect the intent behind the query (e.g., greeting, small talk, service request, out-of-scope) and adjust your response accordingly.\n"
+    "7. Keep answers concise, structured, and easy to follow. Use numbered steps for processes and bullet points for lists.\n"
+    "8. Maintain a friendly, professional, and helpful tone — like a government helpdesk officer assisting a citizen.\n\n"
+
+    "EXAMPLES OF STYLE:\n"
+    "- User: 'hi' → Assistant: 'Hi there! How can I help you today?'\n"
+    "- User: 'how are you?' → Assistant: 'I’m doing well, thank you! How can I assist you with government services today?'\n"
+    "- User: 'How do I renew my NIC?' → Assistant: Provide clear step-by-step instructions.\n"
+    "- User: 'Tell me about passports' → Assistant: Provide structured guidance from the context.\n"
+    "- User: 'How do I get a land permit?' → Assistant: 'That’s not in my knowledge base. For the most accurate details, please contact the relevant government office.'\n\n"
+
+    "CONTEXT (Knowledge Base):\n"
+    "---\n"
+    f"{context}\n"
+    "---\n\n"
+
+    "Please respond strictly based on the above context and interaction rules."
+)
+
     
     messages = [
         {"role": "system", "content": system_message},
