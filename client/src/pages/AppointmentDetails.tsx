@@ -13,6 +13,8 @@ import {
   Star
 } from 'lucide-react';
 import axios from 'axios';
+import { FeedbackForm } from '../components/feedback/FeedbackForm';
+import { FeedbackDisplay } from '../components/feedback/FeedbackDisplay';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -65,6 +67,7 @@ interface Appointment {
   feedback?: {
     rating: number;
     comment: string;
+    submittedAt: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -79,6 +82,7 @@ export const AppointmentDetails = () => {
   const [cancellationReason, setCancellationReason] = useState('');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
 
   const isNewBooking = location.state?.newBooking;
 
@@ -153,6 +157,20 @@ export const AppointmentDetails = () => {
     link.href = appointment.qrCode;
     link.download = `appointment-${appointment.appointmentNumber}.png`;
     link.click();
+  };
+
+  const handleFeedbackSubmitted = (feedback: { rating: number; comment: string; submittedAt: string }) => {
+    if (appointment) {
+      setAppointment({
+        ...appointment,
+        feedback
+      });
+    }
+    setShowFeedbackForm(false);
+  };
+
+  const canProvideFeedback = () => {
+    return appointment?.status === 'completed' && !appointment.feedback?.rating;
   };
 
   if (loading) {
@@ -349,6 +367,42 @@ export const AppointmentDetails = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* Feedback Section */}
+      {appointment.status === 'completed' && (
+        <>
+          {appointment.feedback?.rating ? (
+            <FeedbackDisplay feedback={appointment.feedback} />
+          ) : (
+            <>
+              {showFeedbackForm ? (
+                <FeedbackForm
+                  appointmentId={appointment._id}
+                  appointmentNumber={appointment.appointmentNumber}
+                  serviceName={appointment.service?.name || 'Service'}
+                  onFeedbackSubmitted={handleFeedbackSubmitted}
+                  onCancel={() => setShowFeedbackForm(false)}
+                />
+              ) : (
+                <div className="bg-white rounded-xl shadow-md p-6">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Rate Your Experience</h3>
+                  <p className="text-gray-600 mb-6">
+                    Your appointment has been completed. We'd love to hear about your experience 
+                    to help us improve our services.
+                  </p>
+                  <button
+                    onClick={() => setShowFeedbackForm(true)}
+                    className="bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors flex items-center space-x-2"
+                  >
+                    <Star size={20} />
+                    <span>Provide Feedback</span>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {/* Actions */}

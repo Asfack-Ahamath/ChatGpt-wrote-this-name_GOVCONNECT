@@ -1,12 +1,67 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const QRCode = require('qrcode');
+const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Service = require('../models/Service');
 const TimeSlot = require('../models/TimeSlot');
 const { auth, authorize } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Get all appointments (for analytics/admin use)
+router.get('/', auth, async (req, res) => {
+  try {
+    // Only allow admin and officers to see all appointments
+    if (req.user.role !== 'admin' && req.user.role !== 'officer') {
+      return res.status(403).json({ error: 'Access denied. Only admin or officers can view all appointments.' });
+    }
+
+    const { status, department, limit = 100, page = 1 } = req.query;
+    
+    let query = {};
+    
+    // Filter by status if provided
+    if (status) {
+      query.status = status;
+    }
+    
+    // Filter by department if provided
+    if (department) {
+      query.department = department;
+    }
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const appointments = await Appointment.find(query)
+      .populate('citizen', 'firstName lastName email phoneNumber nic')
+      .populate('service', 'name code processingTime fees')
+      .populate('department', 'name code')
+      .populate('officer', 'firstName lastName')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
+    
+    const totalCount = await Appointment.countDocuments(query);
+    
+    res.json({
+      success: true,
+      data: appointments,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount,
+        pages: Math.ceil(totalCount / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch appointments' 
+    });
+  }
+});
 
 router.get('/available-slots', auth, async (req, res) => {
   try {
@@ -288,6 +343,64 @@ router.put('/:id/cancel', auth, [
   }
 });
 
+// Update appointment status (for admin/officer)
+router.patch('/:id', auth, [
+  body('status').isIn(['pending', 'confirmed', 'completed', 'cancelled', 'no-show']).withMessage('Invalid status'),
+  body('notes.officer').optional().isLength({ max: 500 }).withMessage('Notes too long')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    // Only admin and officers can update appointment status
+    if (req.user.role !== 'admin' && req.user.role !== 'officer') {
+      return res.status(403).json({ error: 'Access denied. Only admin or officers can update appointment status' });
+    }
+
+    const appointment = await Appointment.findById(req.params.id);
+    
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const { status, notes } = req.body;
+    
+    // Update appointment
+    appointment.status = status;
+    
+    // If officer notes provided, update them
+    if (notes && notes.officer) {
+      appointment.notes.officer = notes.officer;
+    }
+    
+    // If status is being changed to confirmed/completed, assign the officer
+    if (['confirmed', 'completed'].includes(status) && req.user.role === 'officer') {
+      appointment.officer = req.user._id;
+    }
+    
+    // Save the updated appointment
+    await appointment.save();
+    
+    // Return the updated appointment with populated fields
+    const updatedAppointment = await Appointment.findById(req.params.id)
+      .populate('service', 'name code description processingTime fees')
+      .populate('department', 'name code')
+      .populate('citizen', 'firstName lastName email phoneNumber nic')
+      .populate('officer', 'firstName lastName');
+
+    res.json({
+      success: true,
+      message: `Appointment status updated to ${status}`,
+      data: updatedAppointment
+    });
+  } catch (error) {
+    console.error('Update appointment error:', error);
+    res.status(500).json({ error: 'Server error while updating appointment' });
+  }
+});
+
 function generateTimeSlots(startTime, endTime, duration) {
   const slots = [];
   const start = parseTime(startTime);
@@ -320,5 +433,221 @@ function formatTime(minutes) {
   const mins = minutes % 60;
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 }
+
+// Submit feedback for completed appointment
+router.post('/:id/feedback', auth, [
+  body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+  body('comment').optional().isLength({ max: 1000 }).withMessage('Comment too long (max 1000 characters)')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { rating, comment } = req.body;
+    const appointmentId = req.params.id;
+
+    // Find the appointment
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    // Check if the user is the citizen who booked the appointment
+    if (appointment.citizen.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Access denied. You can only provide feedback for your own appointments.' });
+    }
+
+    // Check if appointment is completed
+    if (appointment.status !== 'completed') {
+      return res.status(400).json({ error: 'Feedback can only be submitted for completed appointments' });
+    }
+
+    // Check if feedback already exists
+    if (appointment.feedback && appointment.feedback.rating) {
+      return res.status(400).json({ error: 'Feedback has already been submitted for this appointment' });
+    }
+
+    // Add feedback
+    appointment.feedback = {
+      rating: parseInt(rating),
+      comment: comment || '',
+      submittedAt: new Date()
+    };
+
+    await appointment.save();
+
+    // Return updated appointment with populated fields
+    const updatedAppointment = await Appointment.findById(appointmentId)
+      .populate('service', 'name code description processingTime fees')
+      .populate('department', 'name location contactInfo')
+      .populate('citizen', 'firstName lastName email phoneNumber nic')
+      .populate('officer', 'firstName lastName');
+
+    res.json({
+      success: true,
+      message: 'Feedback submitted successfully',
+      data: updatedAppointment
+    });
+  } catch (error) {
+    console.error('Submit feedback error:', error);
+    res.status(500).json({ 
+      error: 'Server error while submitting feedback',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// Get feedback statistics (for admin/analytics)
+router.get('/feedback/stats', auth, async (req, res) => {
+  try {
+    // Only allow admin and officers to view feedback stats
+    if (req.user.role !== 'admin' && req.user.role !== 'officer') {
+      return res.status(403).json({ error: 'Access denied. Only admin or officers can view feedback statistics.' });
+    }
+
+    const { department, service, startDate, endDate } = req.query;
+    
+    // Build match query
+    let matchQuery = {
+      'feedback.rating': { $exists: true, $ne: null },
+      status: 'completed'
+    };
+
+    if (department) {
+      matchQuery.department = mongoose.Types.ObjectId(department);
+    }
+
+    if (service) {
+      matchQuery.service = mongoose.Types.ObjectId(service);
+    }
+
+    if (startDate || endDate) {
+      matchQuery.appointmentDate = {};
+      if (startDate) {
+        matchQuery.appointmentDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        matchQuery.appointmentDate.$lte = new Date(endDate);
+      }
+    }
+
+    const stats = await Appointment.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          totalFeedbacks: { $sum: 1 },
+          averageRating: { $avg: '$feedback.rating' },
+          ratingDistribution: {
+            $push: '$feedback.rating'
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalFeedbacks: 1,
+          averageRating: { $round: ['$averageRating', 2] },
+          ratingDistribution: {
+            rating1: { $size: { $filter: { input: '$ratingDistribution', cond: { $eq: ['$$this', 1] } } } },
+            rating2: { $size: { $filter: { input: '$ratingDistribution', cond: { $eq: ['$$this', 2] } } } },
+            rating3: { $size: { $filter: { input: '$ratingDistribution', cond: { $eq: ['$$this', 3] } } } },
+            rating4: { $size: { $filter: { input: '$ratingDistribution', cond: { $eq: ['$$this', 4] } } } },
+            rating5: { $size: { $filter: { input: '$ratingDistribution', cond: { $eq: ['$$this', 5] } } } }
+          }
+        }
+      }
+    ]);
+
+    // Get service-wise feedback
+    const serviceStats = await Appointment.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: '$service',
+          totalFeedbacks: { $sum: 1 },
+          averageRating: { $avg: '$feedback.rating' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'services',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'serviceInfo'
+        }
+      },
+      {
+        $project: {
+          serviceName: { $arrayElemAt: ['$serviceInfo.name', 0] },
+          totalFeedbacks: 1,
+          averageRating: { $round: ['$averageRating', 2] }
+        }
+      },
+      { $sort: { averageRating: -1 } }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        overall: stats[0] || {
+          totalFeedbacks: 0,
+          averageRating: 0,
+          ratingDistribution: { rating1: 0, rating2: 0, rating3: 0, rating4: 0, rating5: 0 }
+        },
+        byService: serviceStats
+      }
+    });
+  } catch (error) {
+    console.error('Get feedback stats error:', error);
+    res.status(500).json({ 
+      error: 'Server error while fetching feedback statistics',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// Get recent feedback (for admin dashboard)
+router.get('/feedback/recent', auth, async (req, res) => {
+  try {
+    // Only allow admin and officers to view recent feedback
+    if (req.user.role !== 'admin' && req.user.role !== 'officer') {
+      return res.status(403).json({ error: 'Access denied. Only admin or officers can view feedback.' });
+    }
+
+    const { limit = 10, department } = req.query;
+    
+    let matchQuery = {
+      'feedback.rating': { $exists: true, $ne: null },
+      status: 'completed'
+    };
+
+    if (department) {
+      matchQuery.department = mongoose.Types.ObjectId(department);
+    }
+
+    const recentFeedback = await Appointment.find(matchQuery)
+      .populate('citizen', 'firstName lastName')
+      .populate('service', 'name')
+      .populate('department', 'name')
+      .populate('officer', 'firstName lastName')
+      .sort({ 'feedback.submittedAt': -1 })
+      .limit(parseInt(limit))
+      .select('appointmentNumber feedback appointmentDate');
+
+    res.json({
+      success: true,
+      data: recentFeedback
+    });
+  } catch (error) {
+    console.error('Get recent feedback error:', error);
+    res.status(500).json({ 
+      error: 'Server error while fetching recent feedback',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
 
 module.exports = router;

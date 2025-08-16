@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { ReactNode, useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminRouteProps {
@@ -9,6 +9,12 @@ interface AdminRouteProps {
 
 export const AdminRoute = ({ children, requiredRole = 'admin' }: AdminRouteProps) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Force scroll to top on route change
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   if (loading) {
     return (

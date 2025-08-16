@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Menu, X, User, LogOut, Calendar, Home, Settings, FileText, Bell, ChevronDown } from 'lucide-react';
+import { Menu, X, LogOut, Calendar, Home, Settings, FileText, Bell, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
 export const Header = () => {
@@ -26,12 +26,17 @@ export const Header = () => {
     { name: 'Services', href: '/services', icon: FileText },
     ...(user ? [
       { name: 'Dashboard', href: '/dashboard', icon: Calendar },
-      { name: 'My Appointments', href: '/appointments', icon: Calendar },
     ] : [])
   ];
 
+  // Determine if this is an admin page
+  const isAdminPage = location.pathname.startsWith('/admin');
+
   return (
-    <header className="bg-white/95 backdrop-blur-lg shadow-lg border-b border-slate-200/50 sticky top-0 z-40">
+    <header className={`
+      bg-white shadow-lg border-b border-slate-200/50 fixed top-0 left-0 right-0 z-40
+      ${!isAdminPage ? 'md:bg-white/95 md:backdrop-blur-lg' : ''}
+    `}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Title */}
@@ -110,12 +115,12 @@ export const Header = () => {
                           <span>Account Settings</span>
                         </Link>
                         <Link
-                          to="/appointments"
+                          to="/dashboard"
                           className="flex items-center space-x-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <Calendar size={16} />
-                          <span>My Appointments</span>
+                          <span>My Dashboard</span>
                         </Link>
                       </div>
                       

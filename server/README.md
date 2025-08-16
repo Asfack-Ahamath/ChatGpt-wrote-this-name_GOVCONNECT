@@ -22,8 +22,10 @@ Node.js Express API server for the GOVCONNECT application.
 
 3. Create a `.env` file in the server directory with the following variables:
    ```env
-   PORT=5000
    NODE_ENV=development
+   PORT=5000
+   MONGODB_URI=mongodb+srv://root:pass12345@cluster1.f8cotog.mongodb.net/govconnect
+   JWT_SECRET=govconnect-secret-key-2024-sri-lanka
    ```
 
 ### Running the Server

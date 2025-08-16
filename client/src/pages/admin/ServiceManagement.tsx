@@ -9,10 +9,10 @@ import {
   DollarSign,
   Clock,
   Search,
-  Filter,
   Save,
   X,
-  Calendar
+  Calendar,
+  CheckCircle
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -29,8 +29,15 @@ interface Service {
     name: string;
     code: string;
   };
-  processingTime: number;
-  fees: number;
+  processingTime: {
+    estimatedDays: number;
+    description: string;
+  };
+  fees: {
+    amount: number;
+    currency: string;
+    description: string;
+  };
   requiredDocuments: string[];
   appointmentDuration: number;
   maxAdvanceBookingDays: number;
@@ -50,6 +57,9 @@ export const ServiceManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
@@ -59,8 +69,15 @@ export const ServiceManagement = () => {
     description: '',
     category: 'licensing',
     department: '',
-    processingTime: 1,
-    fees: 0,
+    processingTime: {
+      estimatedDays: 1,
+      description: ''
+    },
+    fees: {
+      amount: 0,
+      currency: 'LKR',
+      description: ''
+    },
     requiredDocuments: [''],
     appointmentDuration: 30,
     maxAdvanceBookingDays: 30,
@@ -140,43 +157,68 @@ export const ServiceManagement = () => {
   const handleEdit = (service: Service) => {
     setEditingService(service);
     setFormData({
-      name: service.name,
-      code: service.code,
-      description: service.description,
-      category: service.category,
-      department: service.department._id,
-      processingTime: service.processingTime,
-      fees: service.fees,
-      requiredDocuments: service.requiredDocuments.length > 0 ? service.requiredDocuments : [''],
-      appointmentDuration: service.appointmentDuration,
-      maxAdvanceBookingDays: service.maxAdvanceBookingDays,
-      isActive: service.isActive
+      name: service.name || '',
+      code: service.code || '',
+      description: service.description || '',
+      category: service.category || 'licensing',
+      department: service.department?._id || '',
+      processingTime: {
+        estimatedDays: service.processingTime?.estimatedDays || 1,
+        description: service.processingTime?.description || ''
+      },
+      fees: {
+        amount: service.fees?.amount || 0,
+        currency: service.fees?.currency || 'LKR',
+        description: service.fees?.description || ''
+      },
+      requiredDocuments: Array.isArray(service.requiredDocuments) && service.requiredDocuments.length > 0 
+        ? [...service.requiredDocuments] 
+        : [''],
+      appointmentDuration: service.appointmentDuration || 30,
+      maxAdvanceBookingDays: service.maxAdvanceBookingDays || 30,
+      isActive: typeof service.isActive === 'boolean' ? service.isActive : true
     });
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this service?')) return;
+  const handleDelete = async (service: Service) => {
+    setSelectedService(service);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedService) return;
 
     try {
       const token = localStorage.getItem('govconnect_token');
-      await axios.delete(`${API_BASE_URL}/services/${id}`, {
+      await axios.delete(`${API_BASE_URL}/services/${selectedService._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchServices();
+      setShowDeleteModal(false);
+      setSelectedService(null);
     } catch (error) {
       console.error('Error deleting service:', error);
     }
   };
 
-  const handleToggleStatus = async (id: string, isActive: boolean) => {
+  const handleToggleStatus = async (service: Service) => {
+    setSelectedService(service);
+    setShowDeactivateModal(true);
+  };
+
+  const confirmToggleStatus = async () => {
+    if (!selectedService) return;
+
     try {
       const token = localStorage.getItem('govconnect_token');
-      await axios.patch(`${API_BASE_URL}/services/${id}`, 
-        { isActive: !isActive }, 
+      await axios.patch(`${API_BASE_URL}/services/${selectedService._id}`, 
+        { isActive: !selectedService.isActive }, 
         { headers: { Authorization: `Bearer ${token}` } }
       );
       fetchServices();
+      setShowDeactivateModal(false);
+      setSelectedService(null);
     } catch (error) {
       console.error('Error updating service status:', error);
     }
@@ -189,9 +231,16 @@ export const ServiceManagement = () => {
       description: '',
       category: 'licensing',
       department: '',
-      processingTime: 1,
-      fees: 0,
-      requiredDocuments: [''],
+      processingTime: {
+        estimatedDays: 1,
+        description: ''
+      },
+      fees: {
+        amount: 0,
+        currency: 'LKR',
+        description: ''
+      },
+      requiredDocuments: [''],  // Initialize with one empty document field
       appointmentDuration: 30,
       maxAdvanceBookingDays: 30,
       isActive: true
@@ -202,21 +251,27 @@ export const ServiceManagement = () => {
   const addRequiredDocument = () => {
     setFormData(prev => ({
       ...prev,
-      requiredDocuments: [...prev.requiredDocuments, '']
+      requiredDocuments: Array.isArray(prev.requiredDocuments) 
+        ? [...prev.requiredDocuments, '']
+        : ['']
     }));
   };
 
   const removeRequiredDocument = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      requiredDocuments: prev.requiredDocuments.filter((_, i) => i !== index)
+      requiredDocuments: Array.isArray(prev.requiredDocuments)
+        ? prev.requiredDocuments.filter((_, i) => i !== index)
+        : ['']
     }));
   };
 
   const updateRequiredDocument = (index: number, value: string) => {
     setFormData(prev => ({
       ...prev,
-      requiredDocuments: prev.requiredDocuments.map((doc, i) => i === index ? value : doc)
+      requiredDocuments: Array.isArray(prev.requiredDocuments)
+        ? prev.requiredDocuments.map((doc, i) => i === index ? value : doc)
+        : [value]
     }));
   };
 
@@ -232,12 +287,15 @@ export const ServiceManagement = () => {
     }
   };
 
-  const formatProcessingTime = (days: number) => {
-    return days === 1 ? '1 day' : `${days} days`;
+  const formatProcessingTime = (processingTime: { estimatedDays: number; description: string }) => {
+    const days = processingTime.estimatedDays;
+    return `${days === 1 ? '1 day' : `${days} days`}${processingTime.description ? ` - ${processingTime.description}` : ''}`;
   };
 
-  const formatFees = (amount: number) => {
-    return amount === 0 ? 'Free' : `Rs. ${amount.toLocaleString()}`;
+  const formatFees = (fees: { amount: number; currency: string; description: string }) => {
+    return fees.amount === 0 
+      ? 'Free' 
+      : `${fees.currency} ${fees.amount.toLocaleString()}${fees.description ? ` - ${fees.description}` : ''}`;
   };
 
   const filteredServices = services.filter(service => {
@@ -387,7 +445,7 @@ export const ServiceManagement = () => {
                 {/* Actions */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                   <button
-                    onClick={() => handleToggleStatus(service._id, service.isActive)}
+                    onClick={() => handleToggleStatus(service)}
                     className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                       service.isActive
                         ? 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -405,7 +463,7 @@ export const ServiceManagement = () => {
                       <Edit3 size={16} />
                     </button>
                     <button
-                      onClick={() => handleDelete(service._id)}
+                      onClick={() => handleDelete(service)}
                       className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
                     >
                       <Trash2 size={16} />
@@ -530,27 +588,87 @@ export const ServiceManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Processing Time (days)
+                    Processing Time
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    value={formData.processingTime}
-                    onChange={(e) => setFormData(prev => ({ ...prev, processingTime: parseInt(e.target.value) }))}
-                  />
+                  <div className="space-y-2">
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Days"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      value={formData.processingTime.estimatedDays}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        processingTime: {
+                          ...prev.processingTime,
+                          estimatedDays: parseInt(e.target.value)
+                        }
+                      }))}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description (e.g., 'Standard processing time')"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      value={formData.processingTime.description}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        processingTime: {
+                          ...prev.processingTime,
+                          description: e.target.value
+                        }
+                      }))}
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Service Fees (Rs.)
+                    Service Fees
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    value={formData.fees}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fees: parseInt(e.target.value) }))}
-                  />
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Amount"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        value={formData.fees.amount}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          fees: {
+                            ...prev.fees,
+                            amount: parseInt(e.target.value)
+                          }
+                        }))}
+                      />
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        value={formData.fees.currency}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          fees: {
+                            ...prev.fees,
+                            currency: e.target.value
+                          }
+                        }))}
+                      >
+                        <option value="LKR">LKR</option>
+                        <option value="USD">USD</option>
+                      </select>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Description (e.g., 'Standard fee for processing')"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      value={formData.fees.description}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        fees: {
+                          ...prev.fees,
+                          description: e.target.value
+                        }
+                      }))}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -653,6 +771,84 @@ export const ServiceManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedService && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Delete Service</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the service "{selectedService.name}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setSelectedService(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+              >
+                <Trash2 size={20} />
+                <span>Delete Service</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateModal && selectedService && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              {selectedService.isActive ? 'Deactivate' : 'Activate'} Service
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to {selectedService.isActive ? 'deactivate' : 'activate'} the service "{selectedService.name}"?
+              {selectedService.isActive 
+                ? ' This will prevent citizens from booking new appointments for this service.'
+                : ' This will allow citizens to book new appointments for this service.'}
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeactivateModal(false);
+                  setSelectedService(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmToggleStatus}
+                className={`px-4 py-2 ${
+                  selectedService.isActive 
+                    ? 'bg-red-600 hover:bg-red-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                } text-white rounded-lg transition-colors flex items-center space-x-2`}
+              >
+                {selectedService.isActive ? (
+                  <>
+                    <X size={20} />
+                    <span>Deactivate Service</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={20} />
+                    <span>Activate Service</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

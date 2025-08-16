@@ -21,7 +21,13 @@ interface Service {
   category: string;
   processingTime: number;
   fees: number;
-  requiredDocuments: string[];
+  requiredDocuments: Array<{
+    _id?: string;
+    name: string;
+    description?: string;
+    isMandatory?: boolean;
+    acceptedFormats?: string[];
+  }>;
   maxAdvanceBookingDays: number;
   appointmentDuration: number;
   isActive: boolean;
@@ -29,7 +35,17 @@ interface Service {
     _id: string;
     name: string;
     code: string;
-    location: string;
+    location: {
+      address?: string;
+      city?: string;
+      district?: string;
+      province?: string;
+    };
+    contactInfo?: {
+      phone?: string;
+      email?: string;
+      website?: string;
+    };
   };
 }
 
@@ -45,7 +61,7 @@ export const OfficerServices = () => {
 
   const fetchServices = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('govconnect_token');
       const response = await axios.get(`${API_BASE_URL}/services`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -302,7 +318,31 @@ export const OfficerServices = () => {
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="font-medium text-blue-900">{selectedService.department.name}</p>
                   <p className="text-sm text-blue-700">Code: {selectedService.department.code}</p>
-                  <p className="text-sm text-blue-700">Location: {selectedService.department.location}</p>
+                  <div className="text-sm text-blue-700">
+                    <p><strong>Location:</strong></p>
+                    {selectedService.department.location?.address && (
+                      <p className="ml-2">• {selectedService.department.location.address}</p>
+                    )}
+                    {selectedService.department.location?.city && (
+                      <p className="ml-2">• {selectedService.department.location.city}</p>
+                    )}
+                    {selectedService.department.location?.district && (
+                      <p className="ml-2">• {selectedService.department.location.district}</p>
+                    )}
+                    {selectedService.department.location?.province && (
+                      <p className="ml-2">• {selectedService.department.location.province}</p>
+                    )}
+                  </div>
+                  {selectedService.department.contactInfo?.phone && (
+                    <p className="text-sm text-blue-700 mt-2">
+                      <strong>Phone:</strong> {selectedService.department.contactInfo.phone}
+                    </p>
+                  )}
+                  {selectedService.department.contactInfo?.email && (
+                    <p className="text-sm text-blue-700">
+                      <strong>Email:</strong> {selectedService.department.contactInfo.email}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -310,11 +350,42 @@ export const OfficerServices = () => {
               <div>
                 <h4 className="font-semibold text-gray-900 mb-3">Required Documents</h4>
                 {selectedService.requiredDocuments.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {selectedService.requiredDocuments.map((document, index) => (
-                      <div key={index} className="flex items-center space-x-2 p-2 bg-gray-50 rounded-lg">
-                        <FileText size={16} className="text-gray-600" />
-                        <span className="text-gray-700">{document}</span>
+                      <div key={document._id || index} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-start space-x-3">
+                          <div className="mt-0.5">
+                            <FileText size={18} className="text-gray-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <p className="font-medium text-gray-900">{document.name}</p>
+                              {document.isMandatory && (
+                                <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+                                  Required
+                                </span>
+                              )}
+                            </div>
+                            {document.description && (
+                              <p className="text-sm text-gray-600 mt-1">{document.description}</p>
+                            )}
+                            {document.acceptedFormats && document.acceptedFormats.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700">Accepted Formats:</p>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {document.acceptedFormats.map((format, idx) => (
+                                    <span 
+                                      key={idx}
+                                      className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full"
+                                    >
+                                      {format}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

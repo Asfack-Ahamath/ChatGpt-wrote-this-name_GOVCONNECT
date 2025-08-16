@@ -11,6 +11,12 @@ GOVCONNECT is a modern, user-friendly platform designed to streamline access to 
 - **Status Tracking**: Track application and appointment status in real-time
 - **Multi-language Support**: Interface available in English, සිංහල (Sinhala), and தமிழ் (Tamil)
 - **Mobile-First Design**: Native app-like experience on mobile devices
+- **AI Assistant**: 24/7 chatbot support for government service inquiries
+  - NIC application guidance
+  - Motor vehicle registration help
+  - Document requirements info
+  - Service location details
+  - Real-time assistance
 
 ### 👨‍💼 For Government Officers
 - **Appointment Management**: View and manage citizen appointments
@@ -30,6 +36,7 @@ GOVCONNECT is a modern, user-friendly platform designed to streamline access to 
 ### Prerequisites
 - Node.js (v16 or higher)
 - MongoDB (v4.4 or higher)
+- Python (v3.8 or higher)
 - npm or yarn package manager
 
 ### Installation
@@ -40,7 +47,7 @@ GOVCONNECT is a modern, user-friendly platform designed to streamline access to 
    cd govconnect
    ```
 
-2. **Set up the backend**
+2. **Set up the backend server**
    ```bash
    cd server
    npm install
@@ -54,9 +61,18 @@ GOVCONNECT is a modern, user-friendly platform designed to streamline access to 
    cp .env.example .env  # Configure your environment variables
    ```
 
-4. **Start the development servers**
+4. **Set up the chatbot**
+   ```bash
+   cd chatbot
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   cp .env.example .env  # Configure your environment variables
+   ```
 
-   Backend:
+5. **Start the development servers**
+
+   Backend Server:
    ```bash
    cd server
    npm run dev
@@ -68,9 +84,15 @@ GOVCONNECT is a modern, user-friendly platform designed to streamline access to 
    npm run dev
    ```
 
+   Chatbot:
+   ```bash
+   cd chatbot
+   python run.py
+   ```
+
 ### Environment Variables
 
-#### Backend (.env)
+#### Backend Server (.env)
 ```env
 NODE_ENV=development
 PORT=5000
@@ -83,6 +105,21 @@ JWT_SECRET=govconnect-secret-key-2024-sri-lanka
 VITE_API_URL=http://localhost:5000/api
 ```
 
+#### Chatbot (.env)
+```env
+MISTRAL_API_KEY=NbyuptruAsVKPYOdDA3xtNygCzyVkzeH
+MISTRAL_MODEL_ID=ft:open-mistral-7b:0ffd4d8a:20250718:0b9abfb2
+VECTOR_DIR=govconnect_nic
+DATA_DIR=data
+EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
+MAX_TOKENS=512
+FLASK_DEBUG=False
+FLASK_APP=app.py
+PORT=5001
+HOST=0.0.0.0
+LOG_LEVEL=INFO
+```
+
 ## 🛠️ Tech Stack
 
 ### Frontend
@@ -93,12 +130,20 @@ VITE_API_URL=http://localhost:5000/api
 - **Axios** for API requests
 - **Lucide React** for icons
 
-### Backend
+### Backend Server
 - **Node.js** with Express
 - **MongoDB** with Mongoose
 - **JWT** for authentication
 - **bcrypt** for password hashing
 - **Express Validator** for request validation
+
+### Chatbot
+- **Python** with Flask
+- **Mistral AI** for language model
+- **FAISS** for vector similarity search
+- **BGE Base** for embeddings
+- **dotenv** for configuration
+- **CORS** for cross-origin support
 
 ## 📱 Mobile-First Design
 
@@ -117,6 +162,13 @@ GOVCONNECT is built with a mobile-first approach, providing a native app-like ex
 - **Input Validation**: Comprehensive server-side validation
 - **XSS Protection**: Protection against cross-site scripting
 - **CSRF Protection**: Protection against cross-site request forgery
+- **Chatbot Security**:
+  - API key protection
+  - Rate limiting
+  - Input sanitization
+  - Response filtering
+  - Conversation logging
+  - CORS configuration
 
 ## 📊 Analytics & Monitoring
 
@@ -125,6 +177,12 @@ GOVCONNECT is built with a mobile-first approach, providing a native app-like ex
 - **Error Tracking**: Log and monitor system errors
 - **Performance Metrics**: Track system performance metrics
 - **Audit Logs**: Track important system events
+- **Chatbot Analytics**:
+  - Query patterns and trends
+  - User satisfaction metrics
+  - Response accuracy tracking
+  - Service discovery insights
+  - Conversation flow analysis
 
 ## 🌐 API Documentation
 

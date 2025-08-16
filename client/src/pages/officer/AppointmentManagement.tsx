@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AdminLayout } from '../../components/layout/AdminLayout';
+import { FeedbackDisplay } from '../../components/feedback/FeedbackDisplay';
 import { 
   Calendar, 
   Clock, 
@@ -16,7 +18,8 @@ import {
   Edit3,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Star
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -61,6 +64,11 @@ interface Appointment {
     officer?: string;
     internal?: string;
   };
+  feedback?: {
+    rating: number;
+    comment: string;
+    submittedAt: string;
+  };
   createdAt: string;
 }
 
@@ -72,15 +80,16 @@ interface Officer {
 }
 
 export const AppointmentManagement = () => {
+  const [searchParams] = useSearchParams();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [officers, setOfficers] = useState<Officer[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [filters, setFilters] = useState({
-    status: '',
-    date: '',
-    search: ''
+    status: searchParams.get('status') || '',
+    date: searchParams.get('date') || '',
+    search: searchParams.get('search') || ''
   });
   const [statusUpdate, setStatusUpdate] = useState({
     status: '',
@@ -95,7 +104,7 @@ export const AppointmentManagement = () => {
 
   const fetchAppointments = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('govconnect_token');
       const params = new URLSearchParams();
       
       if (filters.status) params.append('status', filters.status);
@@ -122,7 +131,7 @@ export const AppointmentManagement = () => {
 
   const fetchOfficers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('govconnect_token');
       const response = await axios.get(`${API_BASE_URL}/officer/department-officers`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -136,7 +145,7 @@ export const AppointmentManagement = () => {
     if (!selectedAppointment) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('govconnect_token');
       await axios.patch(
         `${API_BASE_URL}/officer/appointments/${selectedAppointment._id}/status`,
         {
@@ -224,12 +233,87 @@ export const AppointmentManagement = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold">Appointment Management</h1>
-          <p className="opacity-90">Manage and track citizen appointments</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">
+                {filters.date === 'today' ? 'Today\'s Schedule' : 'Appointment Management'}
+              </h1>
+              <p className="opacity-90">
+                {filters.date === 'today' 
+                  ? `Today's appointments - ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`
+                  : 'Manage and track citizen appointments'
+                }
+              </p>
+            </div>
+            {filters.date === 'today' && (
+              <div className="text-right">
+                <div className="bg-white bg-opacity-20 rounded-lg px-4 py-2">
+                  <p className="text-sm opacity-90">Today's Total</p>
+                  <p className="text-2xl font-bold">{appointments.length}</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Today's Schedule Quick Stats */}
+        {filters.date === 'today' && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-xl shadow-md p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Total Today</p>
+                  <p className="text-xl font-bold text-gray-900">{appointments.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-md p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Completed</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {appointments.filter(apt => apt.status === 'completed').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-md p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Pending</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {appointments.filter(apt => ['pending', 'confirmed'].includes(apt.status)).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-md p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                  <XCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Cancelled</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {appointments.filter(apt => ['cancelled', 'no_show'].includes(apt.status)).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -286,17 +370,32 @@ export const AppointmentManagement = () => {
         {/* Appointments List */}
         <div className="bg-white rounded-xl shadow-md">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">
-              Appointments ({appointments.length})
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">
+                {filters.date === 'today' ? 'Today\'s Schedule' : 'Appointments'} ({appointments.length})
+              </h2>
+              {filters.date === 'today' && (
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <Clock size={16} />
+                  <span>Sorted by appointment time</span>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="divide-y divide-gray-200">
             {appointments.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 <Calendar size={48} className="mx-auto mb-4 text-gray-300" />
-                <p className="text-lg">No appointments found</p>
-                <p className="text-sm">Try adjusting your filters</p>
+                <p className="text-lg">
+                  {filters.date === 'today' ? 'No appointments scheduled for today' : 'No appointments found'}
+                </p>
+                <p className="text-sm">
+                  {filters.date === 'today' 
+                    ? 'Enjoy your free day! Check back tomorrow for new appointments.' 
+                    : 'Try adjusting your filters'
+                  }
+                </p>
               </div>
             ) : (
               appointments.map((appointment) => (
@@ -313,6 +412,12 @@ export const AppointmentManagement = () => {
                             {getStatusIcon(appointment.status)}
                             <span className="ml-1 capitalize">{appointment.status.replace('_', ' ')}</span>
                           </span>
+                          {appointment.feedback?.rating && (
+                            <div className="flex items-center space-x-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                              <Star size={12} fill="currentColor" />
+                              <span>{appointment.feedback.rating}/5</span>
+                            </div>
+                          )}
                         </div>
                         
                         {/* Citizen Info */}
@@ -459,6 +564,41 @@ export const AppointmentManagement = () => {
                   onChange={(e) => setStatusUpdate(prev => ({ ...prev, notes: e.target.value }))}
                 />
               </div>
+
+              {/* Feedback Display */}
+              {selectedAppointment.feedback?.rating && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Citizen Feedback
+                  </label>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: 5 }, (_, index) => (
+                          <Star
+                            key={index}
+                            size={16}
+                            fill={index + 1 <= selectedAppointment.feedback!.rating ? '#FCD34D' : 'none'}
+                            stroke={index + 1 <= selectedAppointment.feedback!.rating ? '#FCD34D' : '#D1D5DB'}
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm font-medium">
+                        {selectedAppointment.feedback.rating}/5
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        • {new Date(selectedAppointment.feedback.submittedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {selectedAppointment.feedback.comment && (
+                      <p className="text-sm text-gray-700 italic">
+                        "{selectedAppointment.feedback.comment}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">

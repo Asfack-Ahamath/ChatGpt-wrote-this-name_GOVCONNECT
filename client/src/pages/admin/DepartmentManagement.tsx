@@ -12,7 +12,8 @@ import {
   Search,
   Filter,
   Save,
-  X
+  X,
+  CheckCircle
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -53,6 +54,9 @@ export const DepartmentManagement = () => {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -136,28 +140,44 @@ export const DepartmentManagement = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this department?')) return;
+  const handleDelete = (department: Department) => {
+    setSelectedDepartment(department);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedDepartment) return;
 
     try {
       const token = localStorage.getItem('govconnect_token');
-      await axios.delete(`${API_BASE_URL}/departments/${id}`, {
+      await axios.delete(`${API_BASE_URL}/departments/${selectedDepartment._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchDepartments();
+      setShowDeleteModal(false);
+      setSelectedDepartment(null);
     } catch (error) {
       console.error('Error deleting department:', error);
     }
   };
 
-  const handleToggleStatus = async (id: string, isActive: boolean) => {
+  const handleToggleStatus = (department: Department) => {
+    setSelectedDepartment(department);
+    setShowDeactivateModal(true);
+  };
+
+  const confirmToggleStatus = async () => {
+    if (!selectedDepartment) return;
+
     try {
       const token = localStorage.getItem('govconnect_token');
-      await axios.patch(`${API_BASE_URL}/departments/${id}`, 
-        { isActive: !isActive }, 
+      await axios.patch(`${API_BASE_URL}/departments/${selectedDepartment._id}`, 
+        { isActive: !selectedDepartment.isActive }, 
         { headers: { Authorization: `Bearer ${token}` } }
       );
       fetchDepartments();
+      setShowDeactivateModal(false);
+      setSelectedDepartment(null);
     } catch (error) {
       console.error('Error updating department status:', error);
     }
@@ -325,7 +345,7 @@ export const DepartmentManagement = () => {
                 {/* Actions */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                   <button
-                    onClick={() => handleToggleStatus(department._id, department.isActive)}
+                    onClick={() => handleToggleStatus(department)}
                     className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                       department.isActive
                         ? 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -343,7 +363,7 @@ export const DepartmentManagement = () => {
                       <Edit3 size={16} />
                     </button>
                     <button
-                      onClick={() => handleDelete(department._id)}
+                      onClick={() => handleDelete(department)}
                       className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
                     >
                       <Trash2 size={16} />
@@ -507,6 +527,88 @@ export const DepartmentManagement = () => {
                       }))}
                     />
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Website (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      value={formData.contactInfo.website || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        contactInfo: { ...prev.contactInfo, website: e.target.value }
+                      }))}
+                      placeholder="https://example.gov.lk"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Working Hours */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Working Hours</h4>
+                <div className="space-y-4">
+                  {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => (
+                    <div key={day} className="flex items-center space-x-4">
+                      <div className="w-28">
+                        <span className="text-sm font-medium text-gray-700 capitalize">
+                          {day}
+                        </span>
+                      </div>
+                      <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 items-center">
+                        <input
+                          type="time"
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          value={formData.workingHours[day].start}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            workingHours: {
+                              ...prev.workingHours,
+                              [day]: { ...prev.workingHours[day], start: e.target.value }
+                            }
+                          }))}
+                          disabled={!formData.workingHours[day].isOpen}
+                        />
+                        <input
+                          type="time"
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          value={formData.workingHours[day].end}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            workingHours: {
+                              ...prev.workingHours,
+                              [day]: { ...prev.workingHours[day], end: e.target.value }
+                            }
+                          }))}
+                          disabled={!formData.workingHours[day].isOpen}
+                        />
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`isOpen_${day}`}
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            checked={formData.workingHours[day].isOpen}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              workingHours: {
+                                ...prev.workingHours,
+                                [day]: {
+                                  ...prev.workingHours[day],
+                                  isOpen: e.target.checked,
+                                  start: e.target.checked ? prev.workingHours[day].start || '08:30' : '',
+                                  end: e.target.checked ? prev.workingHours[day].end || '16:30' : ''
+                                }
+                              }
+                            }))}
+                          />
+                          <label htmlFor={`isOpen_${day}`} className="text-sm text-gray-600">
+                            Open
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -545,6 +647,84 @@ export const DepartmentManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedDepartment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Delete Department</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the department "{selectedDepartment.name}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setSelectedDepartment(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+              >
+                <Trash2 size={20} />
+                <span>Delete Department</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateModal && selectedDepartment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              {selectedDepartment.isActive ? 'Deactivate' : 'Activate'} Department
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to {selectedDepartment.isActive ? 'deactivate' : 'activate'} the department "{selectedDepartment.name}"?
+              {selectedDepartment.isActive 
+                ? ' This will prevent citizens from booking appointments with this department.'
+                : ' This will allow citizens to book appointments with this department.'}
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeactivateModal(false);
+                  setSelectedDepartment(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmToggleStatus}
+                className={`px-4 py-2 ${
+                  selectedDepartment.isActive 
+                    ? 'bg-red-600 hover:bg-red-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                } text-white rounded-lg transition-colors flex items-center space-x-2`}
+              >
+                {selectedDepartment.isActive ? (
+                  <>
+                    <X size={20} />
+                    <span>Deactivate Department</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={20} />
+                    <span>Activate Department</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

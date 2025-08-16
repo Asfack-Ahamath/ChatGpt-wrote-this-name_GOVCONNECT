@@ -1,8 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ChatBotProvider } from './contexts/ChatBotContext';
 import { Header } from './components/layout/Header';
 import { MobileHeader } from './components/layout/MobileHeader';
 import { BottomNavigation } from './components/layout/BottomNavigation';
+import { ChatBot } from './components/chatbot/ChatBot';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -53,7 +55,7 @@ function AppContent() {
       )}
       
       {/* Main Content */}
-      <main className={showCitizenNav ? "md:container md:mx-auto md:px-4 md:py-8" : ""}>
+      <main className={showCitizenNav ? "md:container md:mx-auto md:px-4 md:py-8 md:pt-24" : ""}>
         {/* Mobile app-like full screen, desktop with padding */}
         <div className={showCitizenNav ? "md:pb-0 pb-20 md:px-0 px-0" : ""}>
               <Routes>
@@ -202,6 +204,20 @@ function AppContent() {
               <BottomNavigation />
             </div>
           )}
+          
+          {/* ChatBot - Show on all citizen pages */}
+          {showCitizenNav && (
+            <>
+              {/* Desktop floating chatbot */}
+              <div className="hidden md:block">
+                <ChatBot />
+              </div>
+              {/* Mobile chatbot */}
+              <div className="md:hidden">
+                <ChatBot isMobile={true} />
+              </div>
+            </>
+          )}
         </div>
   );
 }
@@ -210,7 +226,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppContent />
+        <ChatBotProvider>
+          <AppContent />
+        </ChatBotProvider>
       </AuthProvider>
     </Router>
   );

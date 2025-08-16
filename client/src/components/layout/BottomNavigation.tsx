@@ -1,15 +1,17 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useChatBot } from '../../contexts/ChatBotContext';
 import { 
   Home, 
-  Calendar, 
   FileText, 
-  User
+  User,
+  MessageCircle
 } from 'lucide-react';
 
 export const BottomNavigation = () => {
   const location = useLocation();
   const { user } = useAuth();
+  const { toggleChat, setIsChatOpen, isChatOpen } = useChatBot();
 
   if (!user) return null;
 
@@ -24,7 +26,7 @@ export const BottomNavigation = () => {
     {
       path: '/dashboard',
       icon: Home,
-      label: 'Home',
+      label: 'Dashboard',
       active: isActive('/dashboard'),
       notification: false
     },
@@ -36,13 +38,6 @@ export const BottomNavigation = () => {
       notification: false
     },
     {
-      path: '/appointments',
-      icon: Calendar,
-      label: 'Appointments',
-      active: isActive('/appointments'),
-      notification: true
-    },
-    {
       path: '/account',
       icon: User,
       label: 'Account',
@@ -51,8 +46,18 @@ export const BottomNavigation = () => {
     }
   ];
 
+
+  
+  const chatButton = {
+    icon: MessageCircle,
+    label: 'Chat',
+    active: isChatOpen,
+    notification: true, // Show notification dot for new chat feature
+    onClick: toggleChat
+  };
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-[90] md:hidden">
       {/* Native iOS/Android style tab bar */}
       <div className="bg-white border-t border-gray-200 px-2 py-1 safe-area-pb">
         <div className="grid grid-cols-4 h-16">
@@ -60,6 +65,7 @@ export const BottomNavigation = () => {
             <Link
               key={item.path}
               to={item.path}
+              onClick={() => setIsChatOpen(false)}
               className={`flex flex-col items-center justify-center space-y-1 transition-all duration-200 rounded-lg mx-1 touch-manipulation ${
                 item.active
                   ? 'text-blue-600'
@@ -97,6 +103,46 @@ export const BottomNavigation = () => {
               </span>
             </Link>
           ))}
+          
+          {/* Chat Button */}
+          <button
+            onClick={chatButton.onClick}
+            className={`flex flex-col items-center justify-center space-y-1 transition-all duration-200 rounded-lg mx-1 touch-manipulation relative z-[91] ${
+              chatButton.active
+                ? 'text-blue-600'
+                : 'text-gray-400 active:text-gray-600 active:bg-gray-50'
+            }`}
+          >
+            <div className="relative">
+              {/* Active indicator background */}
+              {chatButton.active && (
+                <div className="absolute -inset-2 bg-blue-50 rounded-lg"></div>
+              )}
+              
+              {/* Icon container */}
+              <div className="relative z-10 p-1">
+                <chatButton.icon 
+                  size={22} 
+                  strokeWidth={chatButton.active ? 2.5 : 2}
+                  className={`transition-all duration-200 ${
+                    chatButton.active ? 'text-blue-600' : 'text-gray-400'
+                  }`}
+                />
+                
+                {/* Notification badge */}
+                {chatButton.notification && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+              </div>
+            </div>
+            
+            {/* Label */}
+            <span className={`text-xs font-medium transition-colors duration-200 ${
+              chatButton.active ? 'text-blue-600' : 'text-gray-400'
+            }`}>
+              {chatButton.label}
+            </span>
+          </button>
         </div>
       </div>
       

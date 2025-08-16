@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   Users, 
@@ -15,7 +15,7 @@ import {
   UserCheck,
   AlertCircle
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -26,6 +26,17 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+  
+  // Update the date and time every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 60000); // Update every minute
+    
+    // Clean up the interval on unmount
+    return () => clearInterval(timer);
+  }, []);
 
   const adminNavigation = [
     { name: 'Dashboard', href: '/admin', icon: BarChart3, description: 'Overview & Statistics' },
@@ -51,24 +62,25 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
     navigate('/login');
   };
 
-  const isCurrentPage = (href: string) => {
-    try {
-      // Exact match for dashboard routes
-      if (href === '/admin' || href === '/officer') {
-        return location.pathname === href;
-      }
-      // Handle query parameters for officer routes
-      if (href.includes('?')) {
-        const [basePath, queryString] = href.split('?');
-        return location.pathname === basePath && location.search.includes(queryString.split('=')[1]);
-      }
-      // Use exact match for all other routes
-      return location.pathname === href;
-    } catch (error) {
-      console.error('Error in isCurrentPage:', error);
-      return false;
+  // Function to check if navigation item is active
+  const isNavItemActive = (href: string) => {
+    const hrefPath = href.split('?')[0];
+    const hrefQuery = href.includes('?') ? href.split('?')[1] : '';
+    
+    // Special case for exact matches (like dashboard)
+    if (href === '/admin' && location.pathname === '/admin') return true;
+    if (href === '/officer' && location.pathname === '/officer') return true;
+    
+    // For items with query parameters
+    if (hrefQuery) {
+      return location.pathname === hrefPath && location.search.includes(hrefQuery);
     }
+    
+    // For regular paths without query parameters
+    return href !== '/admin' && href !== '/officer' && location.pathname.startsWith(hrefPath) && !location.search;
   };
+
+  // Using NavLink's isActive prop instead of a custom function
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -111,81 +123,57 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
           </button>
         </div>
 
-        {/* User Profile Section */}
-        <div className="p-6 border-b border-slate-200">
-          <div className="flex items-center space-x-4">
-            <div className={`w-12 h-12 ${
-              user?.role === 'admin' ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-cyan-600'
-            } rounded-xl flex items-center justify-center shadow-lg`}>
-              <span className="text-sm font-bold text-white">
-                {user?.firstName.charAt(0)}{user?.lastName.charAt(0)}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="text-xs text-slate-500 truncate">
-                {user?.role === 'admin' ? 'System Administrator' : 'Government Officer'}
-              </p>
-              <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${
-                user?.role === 'admin' 
-                  ? 'bg-indigo-100 text-indigo-800' 
-                  : 'bg-blue-100 text-blue-800'
-              }`}>
-                <div className={`w-1.5 h-1.5 ${
-                  user?.role === 'admin' ? 'bg-indigo-500' : 'bg-blue-500'
-                } rounded-full mr-1.5`} />
-                Online
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Spacer instead of user profile section */}
+        <div className="h-4"></div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4">
+        <nav className="flex-1 p-4 pb-20">
           <div className="space-y-2">
-            {navigation.map((item, index) => (
-              <Link
+            {navigation.map((item) => (
+                              <div
                 key={item.name}
-                to={item.href}
-                className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                  isCurrentPage(item.href)
+                onClick={() => {
+                  setSidebarOpen(false);
+                  navigate(item.href, { replace: true });
+                }}
+                className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 cursor-pointer ${
+                  isNavItemActive(item.href)
                     ? `${user?.role === 'admin' 
                         ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg' 
                         : 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-lg'
                       }`
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
-                                 onClick={() => setSidebarOpen(false)}
               >
-                <div className={`flex items-center justify-center w-10 h-10 rounded-lg mr-3 transition-colors ${
-                  isCurrentPage(item.href)
-                    ? 'bg-white bg-opacity-20'
-                    : `${user?.role === 'admin' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'} group-hover:bg-opacity-80`
-                }`}>
-                  <item.icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{item.name}</p>
-                  <p className={`text-xs truncate ${
-                    isCurrentPage(item.href) 
-                      ? 'text-white text-opacity-80' 
-                      : 'text-slate-400 group-hover:text-slate-600'
+                <>
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-lg mr-3 transition-colors ${
+                    isNavItemActive(item.href)
+                      ? 'bg-white bg-opacity-20'
+                      : `${user?.role === 'admin' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'} group-hover:bg-opacity-80`
                   }`}>
-                    {item.description}
-                  </p>
-                </div>
-                {isCurrentPage(item.href) && (
-                  <div className="w-2 h-2 bg-white rounded-full opacity-80" />
-                )}
-              </Link>
+                    <item.icon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{item.name}</p>
+                    <p className={`text-xs truncate ${
+                      isNavItemActive(item.href)
+                        ? 'text-white text-opacity-80' 
+                        : 'text-slate-400 group-hover:text-slate-600'
+                    }`}>
+                      {item.description}
+                    </p>
+                  </div>
+                  {isNavItemActive(item.href) && (
+                    <div className="w-2 h-2 bg-white rounded-full opacity-80" />
+                  )}
+                </>
+              </div>
             ))}
           </div>
         </nav>
 
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-200">
+        {/* Sidebar Footer - Fixed at the bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200">
           <button
             onClick={handleLogout}
             className="flex items-center w-full px-4 py-3 text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 group"
@@ -222,14 +210,29 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Quick Actions */}
-              <div className="hidden md:flex items-center space-x-2">
-                <Link
-                  to="/dashboard"
-                  className="inline-flex items-center px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  <span>View Citizen Portal</span>
-                </Link>
+              {/* Date and Time Display */}
+              <div className="hidden md:flex items-center space-x-3">
+                <div className="flex items-center space-x-2 text-slate-600">
+                  <Calendar size={16} className="text-slate-400" />
+                  <span className="text-sm font-medium">
+                    {currentDateTime.toLocaleDateString(undefined, { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </span>
+                </div>
+                <div className="w-px h-4 bg-slate-200"></div>
+                <div className="flex items-center space-x-2 text-slate-600">
+                  <Clock size={16} className="text-slate-400" />
+                  <span className="text-sm font-medium">
+                    {currentDateTime.toLocaleTimeString(undefined, { 
+                      hour: '2-digit', 
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
               </div>
 
               {/* User Menu */}
